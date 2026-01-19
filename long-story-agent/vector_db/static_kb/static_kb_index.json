@@ -1,0 +1,201 @@
+{
+  "novels": [
+    {
+      "title": "01",
+      "author": "未知",
+      "genre": "网游",
+      "style_tags": [
+        "网游",
+        "团队战斗",
+        "史诗感",
+        "爽文"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "02",
+      "author": "未知",
+      "genre": "仙侠",
+      "style_tags": [
+        "仙侠",
+        "门派",
+        "权谋",
+        "冲突"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "03",
+      "author": "未知",
+      "genre": "古言",
+      "style_tags": [
+        "古言",
+        "宫廷",
+        "权谋",
+        "压抑情感"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "04",
+      "author": "未知",
+      "genre": "都市热血",
+      "style_tags": [
+        "都市",
+        "军火",
+        "枪战",
+        "快节奏"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "05",
+      "author": "未知",
+      "genre": "玄幻",
+      "style_tags": [
+        "玄幻",
+        "魂技",
+        "团队",
+        "爽感"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "06",
+      "author": "未知",
+      "genre": "都市日常",
+      "style_tags": [
+        "日常",
+        "治愈",
+        "萌宠",
+        "轻松"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "07",
+      "author": "未知",
+      "genre": "玄幻",
+      "style_tags": [
+        "异能",
+        "探索",
+        "设定流",
+        "冷静"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "08",
+      "author": "未知",
+      "genre": "灵异",
+      "style_tags": [
+        "灵异",
+        "校园",
+        "解谜",
+        "悬疑"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "09",
+      "author": "未知",
+      "genre": "仙侠",
+      "style_tags": [
+        "仙妖",
+        "宫斗",
+        "情义",
+        "权谋"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "10",
+      "author": "未知",
+      "genre": "军事",
+      "style_tags": [
+        "军事",
+        "现代战争",
+        "硬核",
+        "战术"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "11",
+      "author": "未知",
+      "genre": "都市",
+      "style_tags": [
+        "都市",
+        "豪门",
+        "对峙",
+        "情感"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "12",
+      "author": "未知",
+      "genre": "都市言情",
+      "style_tags": [
+        "都市",
+        "言情",
+        "家庭",
+        "轻松"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "TEST_1_Input_CN_DE",
+      "author": "未知",
+      "genre": "网游",
+      "style_tags": [
+        "网游",
+        "吐槽",
+        "升级",
+        "轻松"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "TEST_1_Input_CN_RU",
+      "author": "未知",
+      "genre": "网游",
+      "style_tags": [
+        "网游",
+        "吐槽",
+        "升级",
+        "轻松"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "VALID_CN_DE",
+      "author": "未知",
+      "genre": "异能",
+      "style_tags": [
+        "异能",
+        "都市",
+        "轻喜剧",
+        "升级",
+        "吐槽"
+      ],
+      "chunks": 12
+    },
+    {
+      "title": "VALID_CN_RU",
+      "author": "未知",
+      "genre": "异能",
+      "style_tags": [
+        "异能",
+        "都市",
+        "轻喜剧",
+        "升级",
+        "吐槽"
+      ],
+      "chunks": 12
+    }
+  ],
+  "creative_texts": [],
+  "styles": [],
+  "total_documents": 384
+}
