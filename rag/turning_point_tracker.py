@@ -1,6 +1,5 @@
 """
-关键转折点追踪器：记录伏笔、人物变化等关键转折
-确保符合大纲，支持后续提示/修改
+关键转折点追踪器：记录伏笔、人物变化等关键转折（中英双语）
 """
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
@@ -19,6 +18,10 @@ class TurningPointTracker:
         self.config = config
         self.llm_client = llm_client
         self.memory_system = memory_system
+        self.lang = getattr(config, "language", "zh").lower()
+
+    def _is_en(self) -> bool:
+        return str(self.lang).startswith("en")
 
     def detect_turning_points(
         self,
@@ -26,10 +29,29 @@ class TurningPointTracker:
         topic: str,
         context: Optional[str] = None
     ) -> List[Dict]:
-        """
-        检测文本中的关键转折点，返回列表：[{type, content, topic}]
-        """
-        prompt = f"""请分析以下文本，识别关键转折点：
+        """检测文本中的关键转折点，返回列表：[{type, content, topic}]"""
+        if self._is_en():
+            prompt = f"""Analyze the text and extract turning points.
+
+Text:
+{text}
+
+Identify:
+1) Foreshadowing (clues for later)
+2) Character changes (state/relationship/personality shifts)
+3) Plot twists (major reversals)
+4) Key events (important to story direction)
+
+Return JSON:
+{{
+    "foreshadowing": [{{"content": "...", "hint": "what it implies", "position": "where"}}],
+    "character_changes": [{{"character": "...", "change": "...", "reason": "..."}}],
+    "plot_twists": [{{"content": "...", "impact": "..."}}],
+    "key_events": [{{"event": "...", "significance": "..."}}]
+}}"""
+            system_prompt = "You analyze plot structure and detect turning points."
+        else:
+            prompt = f"""请分析以下文本，识别关键转折点：
 
 文本：
 {text}
@@ -41,166 +63,51 @@ class TurningPointTracker:
 4. 关键事件（key_event）：影响故事走向的重要事件
 
 请以JSON格式输出：
-{{
-    "foreshadowing": [{{"content": "伏笔内容", "hint": "暗示什么", "position": "在文本中的位置"}}],
-    "character_changes": [{{"character": "人物名称", "change": "变化描述", "reason": "变化原因"}}],
-    "plot_twists": [{{"content": "转折内容", "impact": "影响"}}],
-    "key_events": [{{"event": "事件描述", "significance": "重要性"}}]
-}}"""
+{
+    "foreshadowing": [{"content": "伏笔内容", "hint": "暗示什么", "position": "在文本中的位置"}],
+    "character_changes": [{"character": "人物名称", "change": "变化描述", "reason": "变化原因"}],
+    "plot_twists": [{"content": "转折内容", "impact": "影响"}],
+    "key_events": [{"event": "事件描述", "significance": "重要性"}]
+}"""
+            system_prompt = "你是一个擅长剧情结构分析的助手。"
 
         messages = [
-            {"role": "system", "content": "你是一个专业的故事分析专家，擅长识别文本中的关键转折点。"},
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
 
         try:
-            response = self.llm_client.chat(messages, temperature=0.3)
-            result = self._parse_turning_points(response)
-            if result:
-                return self._validate_against_outline(result, topic, context)
-            return []
-        except Exception as e:
-            print(f"检测转折点失败: {e}")
+            raw = self.llm_client.chat(messages, temperature=0.3)
+            return self._parse_turning_points(raw, topic)
+        except Exception:
             return []
 
-    def record_turning_point(
-        self,
-        tp_type: str,
-        content: Dict,
-        topic: str,
-        position: Optional[str] = None
-    ) -> str:
-        """
-        记录转折点，统一写入 memory（turning_point_issue），并按类型附带额外存储。
-        """
-        tp_id = f"{tp_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        turning_point = {
-            "id": tp_id,
-            "type": tp_type,
-            "content": content,
+    def record_turning_point(self, tp_type: str, content: Dict, topic: str):
+        """记录转折点到 memory"""
+        self.memory_system.memory_index.setdefault("outlines", []).append({
+            "type": "turning_point",
             "topic": topic,
-            "position": position or "unknown",
-            "timestamp": datetime.now().isoformat()
-        }
-        tp_text = self._format_turning_point(turning_point)
+            "content": content,
+            "structure": {"kind": "turning_point", "tp_type": tp_type},
+            "created_at": datetime.utcnow().isoformat()
+        })
+
+    def _parse_turning_points(self, raw: str, topic: str) -> List[Dict]:
+        """解析转折点 JSON"""
         try:
-            self.memory_system.store_outline(
-                f"转折点（{tp_type}）：{tp_text}",
-                topic,
-                structure={"kind": "turning_point_issue", "type": tp_type, "position": position or "", "id": tp_id}
-            )
+            data = json.loads(self._extract_json(raw))
+            result = []
+            for tp_type in ["foreshadowing", "character_changes", "plot_twists", "key_events"]:
+                for item in data.get(tp_type, []):
+                    result.append({
+                        "type": tp_type,
+                        "content": item,
+                        "topic": topic
+                    })
+            return result
         except Exception:
-            pass
-        if tp_type == "foreshadowing":
-            try:
-                self.memory_system.store_plot_point(tp_text, topic, position)
-            except Exception:
-                pass
-        elif tp_type == "character_change":
-            character_name = content.get("character", "未知")
-            try:
-                self.memory_system.store_character(
-                    character_name,
-                    f"人物变化：{content.get('change', '')}\n原因：{content.get('reason', '')}",
-                    topic
-                )
-            except Exception:
-                pass
-        return tp_id
+            return []
 
-    def check_outline_consistency(
-        self,
-        turning_points: List[Dict],
-        topic: str
-    ) -> Tuple[bool, List[str]]:
-        """
-        检查转折点是否符合大纲
-        """
-        outline = self.memory_system.get_outline_by_topic(topic)
-        if not outline:
-            return True, []
-        outline_text = outline.get("content") or outline.get("structure", {}).get("content", "")
-        tp_text = "\n".join([f"- {tp.get('type', '')}: {tp.get('content', {})}" for tp in turning_points])
-
-        prompt = f"""请检查以下转折点是否符合大纲：
-
-大纲：
-{outline_text}
-
-转折点：
-{tp_text}
-
-请以JSON格式输出：
-{{
-    "consistent": true/false,
-    "issues": ["问题1", "问题2"],
-    "suggestions": ["建议1", "建议2"]
-}}"""
-        messages = [
-            {"role": "system", "content": "你是一个专业的大纲一致性检查专家。"},
-            {"role": "user", "content": prompt}
-        ]
-        try:
-            response = self.llm_client.chat(messages, temperature=0.3)
-            result = self._parse_consistency_check(response)
-            return result.get("consistent", True), result.get("issues", [])
-        except Exception:
-            return True, []
-
-    def _validate_against_outline(
-        self,
-        turning_points: Dict,
-        topic: str,
-        context: Optional[str]
-    ) -> List[Dict]:
-        """
-        将 JSON dict 转为列表并做一致性校验；不一致则写入 memory。
-        """
-        all_tps = []
-        for tp_type, tps in turning_points.items():
-            if isinstance(tps, list):
-                for tp in tps:
-                    all_tps.append({"type": tp_type, "content": tp, "topic": topic})
-
-        consistent, issues = self.check_outline_consistency(all_tps, topic)
-        if not consistent and issues:
-            print(f"⚠️ 转折点不符合大纲: {', '.join(issues[:3])}")
-            try:
-                self.memory_system.store_outline(
-                    "⚠️ 转折点不符合大纲：\n" + "\n".join(issues),
-                    topic,
-                    structure={"kind": "turning_point_issue", "type": "consistency"}
-                )
-            except Exception:
-                pass
-        return all_tps
-
-    def _parse_turning_points(self, response: str) -> Dict:
-        """解析转折点检测结果"""
-        block = self._extract_json_object(response)
-        try:
-            return json.loads(block)
-        except Exception:
-            return {}
-
-    def _parse_consistency_check(self, response: str) -> Dict:
-        """解析一致性检查结果"""
-        block = self._extract_json_object(response)
-        try:
-            return json.loads(block)
-        except Exception:
-            return {"consistent": True, "issues": []}
-
-    def _format_turning_point(self, tp: Dict) -> str:
-        """格式化转折点文本"""
-        content = tp.get("content", {})
-        if isinstance(content, dict):
-            return json.dumps(content, ensure_ascii=False)
-        return str(content)
-
-    def _extract_json_object(self, text: str) -> str:
-        """提取第一个 JSON 对象片段"""
+    def _extract_json(self, text: str) -> str:
         m = re.search(r'\{[\s\S]*\}', text)
-        if m:
-            return m.group(0)
-        return text
+        return m.group(0) if m else text

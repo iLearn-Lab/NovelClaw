@@ -1,0 +1,10 @@
+model_provider = "packycode"
+model = "gpt-5" # 可改为 gpt-5.2-codex / gpt-5.1-codex-max 等
+model_reasoning_effort = "high"
+disable_response_storage = true
+
+[model_providers.packycode]
+name = "packycode"
+base_url = "https://codex-api.packycode.com/v1"
+wire_api = "responses"
+requires_openai_auth = true

@@ -41,7 +41,11 @@ class DocumentProcessor:
             chunk_overlap=config.chunk_overlap,
             length_function=len,
         )
-        self.embedding_model = SentenceTransformer(config.embedding_model)
+        embed_name = (config.embedding_model or "").strip().lower()
+        if embed_name in {"none", "noop", "disable", "disabled"}:
+            self.embedding_model = None
+        else:
+            self.embedding_model = SentenceTransformer(config.embedding_model)
     
     def split_documents(self, text: str) -> List[str]:
         """
@@ -66,6 +70,9 @@ class DocumentProcessor:
         Returns:
             嵌入向量数组
         """
+        if self.embedding_model is None:
+            # return a small dummy vector to avoid heavy model load when embedding is disabled
+            return np.zeros((len(texts), 4), dtype=float)
         embeddings = self.embedding_model.encode(
             texts,
             show_progress_bar=False,

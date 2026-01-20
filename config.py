@@ -40,12 +40,58 @@ class Config:
     """系统配置类"""
     
     def __init__(self, require_api_key: bool = True):
-        # DeepSeek API 配置
-        self.deepseek_api_key: str = os.getenv("DEEPSEEK_API_KEY", "")
-        self.deepseek_base_url: str = os.getenv(
-            "DEEPSEEK_BASE_URL", 
-            "https://api.deepseek.com/v1"
-        )
+        # 基础语言/提供商配置
+        # 默认 auto：根据用户输入动态识别 zh/en
+        self.language: str = os.getenv("LANGUAGE", "auto").lower()  # zh / en / auto
+        # 工作流模式：chaptered（分章）/ unfixed（整篇自由体，推荐英文）
+        self.workflow_mode: str = os.getenv("WORKFLOW_MODE", "chaptered").lower()
+        # 英文子模式：novel（长篇分段写）、premise_story（根据 premise 单篇），可扩展
+        self.en_mode: str = os.getenv("EN_MODE", "novel").lower()
+        # 是否完全跳过大纲（英文自由生成时可用）
+        self.outline_free: bool = os.getenv("OUTLINE_FREE", "0") in {"1", "true", "True", "yes", "YES"}
+        # 英文分段控制（unfixed/novel分段提示长度）
+        self.en_segment_words: int = int(os.getenv("EN_SEGMENT_WORDS", "1200"))
+        self.en_segments: int = int(os.getenv("EN_SEGMENTS", "3"))
+        self.llm_provider: str = os.getenv("LLM_PROVIDER", "deepseek").lower()
+
+        # API Key 与 Base URL（兼容 Codex/OpenAI 与 DeepSeek）
+        if self.llm_provider == "deepseek":
+            self.api_key: str = (
+                os.getenv("DEEPSEEK_API_KEY")
+                or os.getenv("CODEX_API_KEY")
+                or os.getenv("OPENAI_API_KEY")
+                or ""
+            )
+            self.api_base_url: str = (
+                os.getenv("DEEPSEEK_BASE_URL")
+                or "https://api.deepseek.com/v1"
+            )
+        elif self.llm_provider in {"codex", "packycode"}:
+            self.api_key: str = (
+                os.getenv("CODEX_API_KEY")
+                or os.getenv("OPENAI_API_KEY")
+                or os.getenv("DEEPSEEK_API_KEY", "")
+            )
+            self.api_base_url: str = (
+                os.getenv("CODEX_BASE_URL")
+                or os.getenv("OPENAI_BASE_URL")
+                or "https://codex-api.packycode.com/v1"
+            )
+        else:
+            self.api_key: str = (
+                os.getenv("OPENAI_API_KEY")
+                or os.getenv("CODEX_API_KEY")
+                or os.getenv("DEEPSEEK_API_KEY", "")
+            )
+            self.api_base_url: str = (
+                os.getenv("OPENAI_BASE_URL")
+                or os.getenv("CODEX_BASE_URL")
+                or os.getenv("DEEPSEEK_BASE_URL")
+                or "https://api.openai.com/v1"
+            )
+        # 保持向后兼容的字段
+        self.deepseek_api_key: str = self.api_key if self.llm_provider == "deepseek" else os.getenv("DEEPSEEK_API_KEY", "")
+        self.deepseek_base_url: str = self.api_base_url or "https://api.deepseek.com/v1"
         
         # RAG 配置
         # 作为“基目录”使用；具体 collection 建议分开存储在子目录，避免单库损坏影响全局
@@ -80,7 +126,9 @@ class Config:
         self.temperature: float = float(os.getenv("TEMPERATURE", "0.7"))
         # 最大输出token，默认 8000（可通过环境变量覆盖，但高于接口上限会在客户端再截断）
         self.max_tokens: int = int(os.getenv("MAX_TOKENS", "8000"))
-        self.model_name: str = os.getenv("MODEL_NAME", "deepseek-chat")
+        default_model = "deepseek-chat" if self.llm_provider == "deepseek" else "gpt-5.2"
+        self.model_name: str = os.getenv("MODEL_NAME", default_model)
+        self.wire_api: str = os.getenv("WIRE_API", "chat").lower()
         
         # Workflow 配置
         self.min_quality_score: float = 0.7  # 最低质量分数
@@ -129,8 +177,8 @@ class Config:
         self.per_chapter_target_hint: int = 3300
         
         # 验证配置
-        if require_api_key and not self.deepseek_api_key:
-            raise ValueError("请设置 DEEPSEEK_API_KEY 环境变量")
+        if require_api_key and not self.api_key:
+            raise ValueError("请设置 CODEX_API_KEY/OPENAI_API_KEY 或 DEEPSEEK_API_KEY 环境变量")
     
     def __repr__(self):
         return f"Config(model={self.model_name}, db_path={self.vector_db_path})"

@@ -16,6 +16,7 @@ from workflow.analyzer import Analyzer
 from workflow.organizer import AdaptiveOrganizer
 from workflow.reward_system import RewardSystem
 from utils.idea_analyzer import IdeaAnalyzer
+from utils.language_detector import detect_language
 from agents.plot_agent import PlotAgent
 from agents.character_agent import CharacterAgent
 from agents.world_agent import WorldAgent
@@ -31,6 +32,7 @@ class CompositiveExecutor:
     def __init__(self, config: Config):
         self.config = config
         self.llm_client = LLMClient(config)
+        self.lang = getattr(config, "language", "auto")
         # 锁定书名，默认用 topic，若大纲里出现《书名》则覆盖
         self.book_title: Optional[str] = None
         
@@ -75,6 +77,97 @@ class CompositiveExecutor:
             "retrieval": RetrievalAgent(config, self.llm_client, self.retriever, self.memory_system, self.static_kb),
             "writer": WriterAgent(config, self.llm_client, self.retriever, self.memory_system, self.static_kb),
         }
+
+    def _set_language(self, lang: str):
+        """Set runtime language and sync to config so downstream prompts switch."""
+        if not lang:
+            return
+        self.lang = lang
+        self.config.language = lang
+
+    def _is_en(self) -> bool:
+        return str(getattr(self, "lang", "en")).lower().startswith("en")
+
+    def _prompt(self, zh: str, en: str) -> str:
+        """Return prompt text based on current language selection."""
+        return en if self._is_en() else zh
+
+    def _generate_unfixed_story(
+        self,
+        idea: str,
+        topic: Optional[str],
+        target_length: Optional[int],
+        genre: Optional[str],
+        style_tags: Optional[List[str]],
+        initial_knowledge: Optional[str],
+        outline_free: bool = False,
+    ) -> Dict:
+        """
+        英文整篇模式：默认分段多轮生成，隐藏标题但保层次，使用记忆。
+        """
+        print("[Workflow] Unfixed EN mode: generating multi-segment story without explicit headings.")
+        topic = topic or idea[:120]
+        genre = genre or "general"
+        style_tags = style_tags or ["immersive", "tight-pacing"]
+        # optional initial knowledge into RAG
+        if initial_knowledge:
+            self.retriever.add_knowledge(initial_knowledge, {"type": "initial"})
+        outline = ""
+        if not outline_free:
+            outline = self._generate_global_outline(
+                idea=idea,
+                topic=topic,
+                genre=genre,
+                style_tags=style_tags,
+                target_length=target_length or 5000
+            )
+        # 分段控制
+        seg_words = getattr(self.config, "en_segment_words", 1800)
+        seg_count = getattr(self.config, "en_segments", 4)
+        if target_length:
+            seg_count = max(2, min(10, round((target_length or 6000) / max(seg_words, 800))))
+        generated_segments = []
+        round_results = []
+
+        for idx in range(seg_count):
+            prompt = f"""Premise: {idea}
+Genre: {genre}
+Style tags: {', '.join(style_tags)}
+Global outline (if any):
+{outline if outline else '[outline skipped]'}
+
+You are writing segment {idx+1}/{seg_count} of a long English story. Continue the narrative with clear structure (setup/rising/climax/resolution across segments), grounded characters, coherent worldbuilding. Avoid headings/markdown/bullets. Aim ~{seg_words} words. Maintain continuity with prior segments via memory; do not restart the story."""
+            context_text = None
+            if generated_segments:
+                context_text = "\n".join(generated_segments[-2:])
+            res = self.agents["writer"].generate(
+                prompt,
+                context=context_text,
+                topic=topic,
+                genre=genre,
+                style_tags=style_tags,
+                target_length=seg_words
+            )
+            content = res.get("content", "")
+            round_results.append(res)
+            generated_segments.append(content)
+            # store into memory for later retrieval
+            try:
+                self.memory_system.store_generated_text(content, topic, {"source": "unfixed_segment", "segment": idx+1})
+            except Exception:
+                pass
+
+        final_text = "\n\n".join(generated_segments)
+        return {
+            "topic": topic,
+            "text_type": "creative",
+            "length": len(final_text),
+            "iterations": seg_count,
+            "chapters_written": seg_count,
+            "best_reward": 1.0,
+            "final_text": final_text,
+            "round_results": round_results,
+        }
     
     def generate_long_text(
         self,
@@ -103,10 +196,29 @@ class CompositiveExecutor:
         Returns:
             生成结果
         """
+        # Detect language when in auto mode to switch prompts/output
+        if getattr(self.config, "language", "auto") == "auto":
+            detected = detect_language(idea)
+            self._set_language(detected)
+        else:
+            self._set_language(getattr(self.config, "language", "en"))
+
+        # 英文 unfixed 工作流：整篇生成，不强制分章（premise_story 模式）
+        if self._is_en() and getattr(self.config, "workflow_mode", "chaptered") == "unfixed":
+            return self._generate_unfixed_story(
+                idea=idea,
+                topic=topic,
+                target_length=target_length,
+                genre=genre,
+                style_tags=style_tags,
+                initial_knowledge=initial_knowledge,
+                outline_free=getattr(self.config, "outline_free", False)
+            )
+
         # 0. 自动分析idea（如果启用）
         if auto_analyze:
             print(f"[IdeaAnalyzer] 正在分析创意想法...")
-            idea_analysis = self.idea_analyzer.analyze_idea(idea)
+            idea_analysis = self.idea_analyzer.analyze_idea(idea, language=self.lang)
             
             # 使用分析结果填充缺失的参数
             if not topic:
@@ -136,7 +248,7 @@ class CompositiveExecutor:
             if not genre:
                 genre = "general"
             if not style_tags:
-                style_tags = ["细腻"]
+                style_tags = ["delicate"] if self._is_en() else ["细腻"]
         
         # 1. 添加初始知识（如果有）
         if initial_knowledge:
@@ -678,7 +790,10 @@ class CompositiveExecutor:
                 "请基于以上设定写出连贯的正文段落，衔接自然，避免重复。"
                 "如需引入新人物/设定/规则，请先明确交代其来源、动机/用途、与现有设定或人物的关联，"
                 "避免凭空跳出，与既有世界观保持一致。"
-                f"正文开头请写出章节标题：`第{self.chapter_counter}章 {outline_title}`（若有标题），其余不写小标题/Markdown标题。"
+                + self._prompt(
+                    f"正文开头请写出章节标题：`第{self.chapter_counter}章 {outline_title}`（若有标题），其余不写小标题/Markdown标题。",
+                    "Do NOT include chapter headings or Markdown titles; continue directly in narrative prose. If needed, use seamless transitions instead of headings."
+                )
                 + length_tip + "\n" + chapter_tip + chapter_outline_tip + title_tip + main_hint + tp_hint + "\n" + min_words_hint + "\n" + ending_hint
             )
         else:
@@ -756,7 +871,8 @@ class CompositiveExecutor:
             精炼后的文本
         """
         # 使用LLM进行最终整合和优化
-        prompt = f"""请将以下内容整合成一篇连贯、完整的中文小说正文（不要用提纲/要点/列表格式）：
+        prompt = self._prompt(
+            f"""请将以下内容整合成一篇连贯、完整的中文小说正文（不要用提纲/要点/列表格式）：
 
 主题：{topic}
 
@@ -770,12 +886,31 @@ class CompositiveExecutor:
 4. 确保各部分衔接自然
 5. 使用小说叙事笔法：有场景、有动作、有心理、有对话（如适用），分段自然
 
-请直接输出整合后的文本，不需要额外说明。"""
+请直接输出整合后的文本，不需要额外说明。""",
+            f"""Please merge the following content into a cohesive, complete English narrative (no bullet points or outlines).
+
+Topic: {topic}
+
+Content:
+{text}
+
+Ensure:
+1) Logical flow and clear structure.
+2) Remove repetition and contradictions.
+3) Keep creativity and freshness.
+4) Natural transitions between parts.
+5) Use narrative prose (scenes, action, inner thoughts, dialogue as appropriate), with natural paragraphs.
+
+Output only the merged text without extra explanation.""",
+        )
         
         messages = [
             {
                 "role": "system",
-                "content": "你是一个专业的文本编辑专家，擅长整合和优化文本内容。"
+                "content": self._prompt(
+                    "你是一个专业的文本编辑专家，擅长整合和优化文本内容。",
+                    "You are a professional text editor skilled at merging and polishing narrative prose."
+                )
             },
             {"role": "user", "content": prompt}
         ]
@@ -816,7 +951,8 @@ class CompositiveExecutor:
         """
         生成章节摘要与关键要点，便于后续检索与一致性控制
         """
-        prompt = f"""请对以下章节内容做摘要，并列出关键人物/事件/设定，输出不超过400字：
+        prompt = self._prompt(
+            f"""请对以下章节内容做摘要，并列出关键人物/事件/设定，输出不超过400字：
 
 主题：{topic}
 章节：第{chapter_index}章
@@ -827,9 +963,22 @@ class CompositiveExecutor:
 1）精炼摘要（200-400字）；
 2）关键人物与关系；
 3）关键事件/伏笔；
-4）重要设定（规则/时间/地点）。"""
+4）重要设定（规则/时间/地点）。""",
+            f"""Summarize the following chapter and list key characters/events/settings (max 400 words):
+
+Topic: {topic}
+Chapter: {chapter_index}
+Text:
+{text}
+
+Output:
+1) Concise summary (200-400 words)
+2) Key characters & relationships
+3) Key events / foreshadowing
+4) Important settings (rules/time/place)."""
+        )
         messages = [
-            {"role": "system", "content": "你是长篇小说的章节总结助手，擅长提炼要点并保持一致性。"},
+            {"role": "system", "content": self._prompt("你是长篇小说的章节总结助手，擅长提炼要点并保持一致性。", "You are a long-form chapter summarization assistant who keeps consistency.")},
             {"role": "user", "content": prompt}
         ]
         try:
@@ -851,7 +1000,8 @@ class CompositiveExecutor:
         low = max(5, est - 1)
         high = min(30, est + 2)
         per_hint = getattr(self.config, "per_chapter_target_hint", 3300) or 3300
-        prompt = f"""请基于以下创意生成全书大纲（用于长篇连贯写作），要求：
+        prompt = self._prompt(
+            f"""请基于以下创意生成全书大纲（用于长篇连贯写作），要求：
 1）给出 {low}-{high} 章的章节标题与每章1-3句要点（单章建议长度约 {per_hint} 字，允许上下浮动但保证整体均衡）；
 2）列出核心人物卡（人物：目标/矛盾/关系）；
 3）列出世界观/规则的硬约束；
@@ -864,9 +1014,24 @@ class CompositiveExecutor:
 风格：{style or '未指定'}
 目标长度：{target_length}字
 创意：{idea}
+""",
+            f"""Based on the premise/idea below, generate a full-book outline for long-form writing. Requirements:
+1) Provide {low}-{high} chapter titles with 1-3 bullet sentences each (target ~{per_hint} words per chapter, balanced overall).
+2) List core character cards (character: goals/conflicts/relationships).
+3) List hard constraints for world/setting rules.
+4) List major foreshadowing and expected payoff chapters.
+5) Final chapter must deliver a clear ending and resolve main conflicts and foreshadowing—no cliffhangers.
+6) Keep it concrete and executable, not vague.
+
+Topic: {topic}
+Genre: {genre or 'general'}
+Style: {style or 'unspecified'}
+Target length: {target_length} words
+Idea: {idea}
 """
+        )
         messages = [
-            {"role": "system", "content": "你是长篇小说总编剧，擅长设计可执行的章节大纲与设定卡片。"},
+            {"role": "system", "content": self._prompt("你是长篇小说总编剧，擅长设计可执行的章节大纲与设定卡片。", "You are a head writer for long-form fiction, great at producing actionable chapter outlines and setting cards.")},
             {"role": "user", "content": prompt}
         ]
         return self.llm_client.chat(messages, temperature=0.4, max_tokens=self.config.max_tokens)
@@ -887,7 +1052,8 @@ class CompositiveExecutor:
         prev = self.memory_system.get_recent_outlines(topic, limit=1, kind="rolling_summary")
         prev_text = prev[-1].get("content", "") if prev else ""
         
-        prompt = f"""请将“之前的滚动摘要”和“新增章节摘要”融合为新的滚动摘要：
+        prompt = self._prompt(
+            f"""请将“之前的滚动摘要”和“新增章节摘要”融合为新的滚动摘要：
 要求：1）保留全局关键人物状态、关键设定、主线推进、未兑现伏笔；2）删除过细情节；3）控制在800-1200字。
 
 之前的滚动摘要：
@@ -895,9 +1061,19 @@ class CompositiveExecutor:
 
 新增章节摘要：
 {new_chapter_summary}
+""",
+            f"""Merge the previous rolling summary with the new chapter summary into an updated rolling summary:
+Requirements: 1) Keep global key character states, critical settings, main-plot progress, unresolved foreshadowing; 2) Drop overly fine details; 3) Target 800-1200 words.
+
+Previous rolling summary:
+{prev_text}
+
+New chapter summary:
+{new_chapter_summary}
 """
+        )
         messages = [
-            {"role": "system", "content": "你是长篇小说滚动摘要助手，擅长保持全局一致性。"},
+            {"role": "system", "content": self._prompt("你是长篇小说滚动摘要助手，擅长保持全局一致性。", "You are a rolling-summary assistant for long-form fiction, maintaining global consistency.")},
             {"role": "user", "content": prompt}
         ]
         try:
@@ -909,7 +1085,8 @@ class CompositiveExecutor:
         """
         从章节内容提取“事实卡片”（短条目），用于后续写作强制对齐，降低幻觉。
         """
-        prompt = f"""请从以下章节正文提取“事实卡片”，每条不超过120字：
+        prompt = self._prompt(
+            f"""请从以下章节正文提取“事实卡片”，每条不超过120字：
 - 人物状态变化（含动机/关系变化）
 - 关键事件与因果
 - 世界观/规则硬约束（新增/确认）
@@ -923,9 +1100,25 @@ class CompositiveExecutor:
 章节：第{chapter_index}章
 正文：
 {text}
+""",
+            f"""Extract concise "fact cards" from the chapter text below (each <=120 words):
+- Character state changes (including motivation/relationship shifts)
+- Key events and causality
+- World/setting hard constraints (new/confirmed)
+- Foreshadowing and promises (to be fulfilled later)
+
+Rules:
+1) Only include facts explicitly stated or directly implied; no fabrication.
+2) Output as bullet list (one per line), max 10 items.
+
+Topic: {topic}
+Chapter: {chapter_index}
+Text:
+{text}
 """
+        )
         messages = [
-            {"role": "system", "content": "你是事实抽取助手，只提取明确事实，不做臆测。"},
+            {"role": "system", "content": self._prompt("你是事实抽取助手，只提取明确事实，不做臆测。", "You are a fact-extraction assistant; extract only explicit or directly implied facts, no speculation.")},
             {"role": "user", "content": prompt}
         ]
         try:
@@ -1106,7 +1299,8 @@ class CompositiveExecutor:
         通过 LLM Agent 生成章节大纲（JSON），严格基于全局大纲，不得新增主线/人物/设定。
         """
         style = ", ".join(style_tags or [])
-        prompt = f"""基于以下全局大纲，为全书生成章节级大纲，输出 JSON 数组：
+        prompt = self._prompt(
+            f"""基于以下全局大纲，为全书生成章节级大纲，输出 JSON 数组：
 [
   {{"chapter":1,"title":"章节标题","content":"本章要点1-3句"}},
   ...
@@ -1123,9 +1317,28 @@ class CompositiveExecutor:
 风格：{style or '未指定'}
 全局大纲：
 {outline_text}
+""",
+            f"""Based on the global outline below, generate chapter-level outlines as a JSON array:
+[
+  {{"chapter":1,"title":"Chapter Title","content":"1-3 key sentences"}},
+  ...
+]
+Requirements:
+1) Chapter numbers start at 1 and must match the global outline count; no adding/removing chapters.
+2) Titles must match (or lightly adjust) the corresponding titles from the global outline; no renaming/jumping.
+3) content should include 1-3 key sentences strictly derived from the global outline; do NOT introduce new plotlines/characters/settings/locations.
+4) Preserve logical order and resolution; keep foreshadowing/payoff positions aligned.
+5) Output valid JSON; each element has chapter/title/content fields.
+
+Topic: {topic}
+Genre: {genre or 'general'}
+Style: {style or 'unspecified'}
+Global outline:
+{outline_text}
 """
+        )
         messages = [
-            {"role": "system", "content": "你是长篇小说的章节规划助手，请输出可执行的章节大纲。"},
+            {"role": "system", "content": self._prompt("你是长篇小说的章节规划助手，请输出可执行的章节大纲。", "You are a chapter-planning assistant for long-form fiction; output executable chapter outlines.")},
             {"role": "user", "content": prompt}
         ]
         try:
@@ -1461,7 +1674,8 @@ class CompositiveExecutor:
         except Exception:
             global_outline = ""
         style = ", ".join(style_tags or [])
-        prompt = f"""书名：{topic}
+        prompt = self._prompt(
+            f"""书名：{topic}
 当前章节：第{chapter_no}章{('：' + title) if title else ''}
 全局大纲：
 {global_outline}
@@ -1473,7 +1687,21 @@ class CompositiveExecutor:
 1）本章核心事件/转折；
 2）需出现的关键人物（保持姓名与大纲一致）；
 3）需遵守的世界观规则或伏笔提示；
-4）结尾走向（勿提前剧透后续章主线）。"""
+4）结尾走向（勿提前剧透后续章主线）。""",
+            f"""Book: {topic}
+Current chapter: {chapter_no}{(' - ' + title) if title else ''}
+Global outline:
+{global_outline}
+
+Chapter outline:
+{outline_text}
+
+Without adding beyond the outlines, provide a concise writing plan (150-250 words) including:
+1) Core events/turning points for this chapter;
+2) Required key characters (keep names consistent with outline);
+3) World/setting rules or foreshadowing to respect;
+4) Ending direction (avoid spoiling later chapters)."""
+        )
         agent = self.agents["plot"]
         try:
             res = agent.generate(prompt, "", topic=topic, genre=genre, style_tags=style_tags)

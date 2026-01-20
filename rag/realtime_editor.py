@@ -23,6 +23,10 @@ class RealtimeEditor:
         self.llm_client = llm_client
         self.memory_system = memory_system
         self.turning_point_tracker = turning_point_tracker
+        self.lang = getattr(config, "language", "zh").lower()
+
+    def _is_en(self) -> bool:
+        return str(self.lang).startswith("en")
     
     def detect_modification_needs(
         self,
@@ -108,7 +112,28 @@ class RealtimeEditor:
                 f"{i}. [{mod['type']}] {mod.get('issue', mod.get('suggestion', ''))}"
             )
         
-        prompt = f"""请根据以下修改建议，调整文本：
+        if self._is_en():
+            prompt = f"""Adjust the text based on the modification suggestions:
+
+Original text:
+{text}
+
+Relevant context:
+{context}
+
+Needed changes:
+{chr(10).join(mod_descriptions)}
+
+Please:
+1) Keep overall style and structure.
+2) Ensure consistency with outline/characters.
+3) Smooth turning points; avoid abruptness.
+4) Maintain coherence.
+
+Output only the revised full text."""
+            system_prompt = "You are a professional fiction editor; apply the requested changes and keep coherence."
+        else:
+            prompt = f"""请根据以下修改建议，调整文本：
 
 原始文本：
 {text}
@@ -126,11 +151,12 @@ class RealtimeEditor:
 4. 保持文本的连贯性
 
 请直接输出修改后的完整文本，不需要说明修改了哪些地方。"""
+            system_prompt = "你是一个专业的文本编辑专家，擅长根据反馈调整文本，保持整体一致性。"
         
         messages = [
             {
                 "role": "system",
-                "content": "你是一个专业的文本编辑专家，擅长根据反馈调整文本，保持整体一致性。"
+                "content": system_prompt
             },
             {"role": "user", "content": prompt}
         ]

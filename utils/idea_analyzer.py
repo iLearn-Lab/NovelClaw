@@ -1,5 +1,5 @@
 """
-Idea分析器：根据用户的idea自动推断风格、类型等
+Idea分析器：根据用户的idea自动推断风格、类型等（支持中英）
 """
 from typing import Dict, List, Optional
 from utils.llm_client import LLMClient
@@ -10,27 +10,21 @@ import re
 
 class IdeaAnalyzer:
     """Idea分析器：从用户输入的idea中提取风格、类型等信息"""
-    
+
     def __init__(self, config: Config, llm_client: LLMClient):
         self.config = config
         self.llm_client = llm_client
-    
+
     def analyze_idea(
         self,
         idea: str,
-        language: str = "chinese"
+        language: str = "auto"
     ) -> Dict:
         """
-        分析用户的idea，自动推断风格、类型等
-        
-        Args:
-            idea: 用户的创意想法
-            language: 语言（chinese/english）
-        
-        Returns:
-            分析结果，包含genre, style_tags, text_type等
+        分析用户的idea，自动推断风格、类型等（中英双语）
         """
-        prompt = f"""请分析以下创意想法，提取关键信息：
+        lang = str(language).lower()
+        zh_prompt = f"""请分析以下创意想法，提取关键信息：
 
 创意想法：
 {idea}
@@ -54,54 +48,74 @@ class IdeaAnalyzer:
     "suggested_length": 5000,
     "complexity": "medium"
 }}"""
-        
+        en_prompt = f"""Analyze the creative idea below and extract key information.
+
+Idea:
+{idea}
+
+Extract:
+1. Story genre (e.g., sci-fi, fantasy, mystery, historical, contemporary).
+2. Style tags (e.g., delicate, epic, suspenseful, humorous, serious, romantic; max 5).
+3. Text type: creative.
+4. Keywords: 3-5 keywords.
+5. Target audience: e.g., teen, adult.
+6. Language style: e.g., modern, classical, colloquial.
+
+Return JSON:
+{{
+    "genre": "sci-fi",
+    "style_tags": ["delicate", "epic", "suspenseful"],
+    "text_type": "creative",
+    "keywords": ["AI", "future", "awakening"],
+    "target_audience": "adult",
+    "language_style": "modern",
+    "suggested_length": 5000,
+    "complexity": "medium"
+}}"""
+
+        prompt = en_prompt if lang.startswith("en") else zh_prompt
+        system_prompt = (
+            "You are a creative-analysis expert who extracts genre, style, theme, and related info."
+            if lang.startswith("en")
+            else "你是一个专业的创意分析专家，擅长从用户的创意想法中提取关键信息，包括类型、风格、主题等。"
+        )
+
         messages = [
-            {
-                "role": "system",
-                "content": "你是一个专业的创意分析专家，擅长从用户的创意想法中提取关键信息，包括类型、风格、主题等。"
-            },
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ]
-        
+
         try:
             response = self.llm_client.chat(messages, temperature=0.3)
             result = self._parse_analysis(response)
-            
-            # 设置默认值
+
             if not result:
-                result = {
-                    "genre": "general",
-                    "style_tags": ["细腻"],
-                    "text_type": "creative",
-                    "keywords": [],
-                    "target_audience": "成人",
-                    "language_style": "现代",
-                    "suggested_length": 5000,
-                    "complexity": "medium"
-                }
-            
-            # 确保必要字段存在
+                result = self._default_result(lang)
+
+            # Ensure required fields
             result.setdefault("genre", "general")
-            result.setdefault("style_tags", ["细腻"])
+            result.setdefault("style_tags", ["delicate"] if lang.startswith("en") else ["细腻"])
             result.setdefault("text_type", "creative")
             result.setdefault("keywords", [])
-            
+
             return result
-            
+
         except Exception as e:
             print(f"分析idea失败: {e}")
-            # 返回默认值
-            return {
-                "genre": "general",
-                "style_tags": ["细腻"],
-                "text_type": "creative",
-                "keywords": [],
-                "target_audience": "成人",
-                "language_style": "现代",
-                "suggested_length": 5000,
-                "complexity": "medium"
-            }
-    
+            return self._default_result(lang)
+
+    def _default_result(self, lang: str) -> Dict:
+        return {
+            "genre": "general",
+            "style_tags": ["immersive", "tight-pacing"] if lang.startswith("en") else ["细腻"],
+            "text_type": "creative",
+            "keywords": [],
+            "target_audience": "adult" if lang.startswith("en") else "成人",
+            "language_style": "modern" if lang.startswith("en") else "现代",
+            "suggested_length": 5000,
+            "complexity": "medium"
+        }
+
     def _parse_analysis(self, response: str) -> Dict:
         """解析分析结果"""
         json_match = re.search(r'\{[^{}]*\}', response, re.DOTALL)
@@ -111,39 +125,40 @@ class IdeaAnalyzer:
             except:
                 pass
         return {}
-    
+
     def extract_topic_from_idea(self, idea: str) -> str:
         """
         从idea中提取主题（用于生成）
-        
-        Args:
-            idea: 用户的创意想法
-        
-        Returns:
-            提取的主题
         """
-        # 如果idea很短，直接作为topic
         if len(idea) < 100:
             return idea
-        
-        # 否则提取关键部分
-        prompt = f"""请从以下创意想法中提取一个简洁的主题（不超过50字）：
+
+        lang = str(getattr(self.config, "language", "zh")).lower()
+        if lang.startswith("en"):
+            prompt = f"""Extract a concise topic (<=50 words) from the idea below.
+
+{idea}
+
+Output only the topic, nothing else."""
+            system = "You are an extraction expert."
+        else:
+            prompt = f"""请从以下创意想法中提取一个简洁的主题（不超过50字）：
 
 {idea}
 
 请直接输出主题，不要其他说明。"""
-        
+            system = "你是一个专业的文本提取专家。"
+
         messages = [
             {
                 "role": "system",
-                "content": "你是一个专业的文本提取专家。"
+                "content": system
             },
             {"role": "user", "content": prompt}
         ]
-        
+
         try:
             topic = self.llm_client.chat(messages, temperature=0.3)
             return topic.strip()[:100]  # 限制长度
         except:
-            return idea[:100]  # 如果失败，返回前100字
-
+            return idea[:100]
