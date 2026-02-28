@@ -19,11 +19,13 @@
           <a href="#contributions">贡献</a>
           <a href="#method">方法</a>
           <a href="#architecture">架构</a>
+          <a href="#results">结果</a>
           <a href="#evaluation">评估</a>
           <a href="#quickstart">复现</a>
           <a href="#demo">示例</a>
           <a href="#related">相关工作</a>
           <a href="#limitations">限制</a>
+          <a href="#references">参考</a>
           <a href="#citation">引用</a>
           <a href="#repo">仓库</a>
           <a href="#deploy">部署</a>
@@ -51,6 +53,20 @@
               <span>支持 DeepSeek / OpenAI / Codex</span>
               <span>可扩展工作流与多种写作模式</span>
             </div>
+            <div class="paper-meta">
+              <div>
+                <span class="label">作者</span>
+                <span class="value">xiao-zi-chen</span>
+              </div>
+              <div>
+                <span class="label">机构</span>
+                <span class="value">Independent Research</span>
+              </div>
+              <div>
+                <span class="label">版本</span>
+                <span class="value">2026-02</span>
+              </div>
+            </div>
           </div>
           <div class="hero-card">
             <div class="stat">
@@ -72,7 +88,7 @@
       <section class="section abstract-section" id="abstract">
         <div class="container">
           <h2>摘要</h2>
-          <div class="abstract-card">
+          <div class="abstract-card reveal">
             <p>
               长文本生成面临结构漂移、角色不一致与主题偏移等问题。我们构建了一个协同式
               RAG-Agent 系统，将剧情、人物、世界观、检索、评估与写作能力模块化，并通过
@@ -80,6 +96,16 @@
               系统支持章节化与整篇模式，可通过参数控制长度、节奏与评估频率，并在实际输出中
               提供可追溯的过程记录与可复现的配置入口。
             </p>
+            <div class="keywords">
+              <span>关键词</span>
+              <div class="tag-list">
+                <span>多 Agent</span>
+                <span>RAG</span>
+                <span>动态记忆</span>
+                <span>一致性评估</span>
+                <span>长文本生成</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -88,15 +114,15 @@
         <div class="container">
           <h2>主要贡献</h2>
           <div class="grid contributions">
-            <div class="card">
+            <div class="card reveal">
               <h3>协同式多 Agent 结构</h3>
               <p>将规划、写作、检索、评估解耦为独立 Agent，支持可插拔与分阶段执行。</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>动态记忆与一致性闭环</h3>
               <p>按章节写入向量记忆，并通过一致性检查与实时修订回写改进内容。</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>可复现的生成流程</h3>
               <p>记录大纲、轮次摘要、评估得分与输出文本，便于对比实验与追溯。</p>
             </div>
@@ -147,11 +173,11 @@
             从任务分析、全局大纲、章节生成到一致性评估与修订的完整闭环。
           </p>
           <div class="media-grid">
-            <figure>
+            <figure class="reveal">
               <img src="workflow.png" alt="Workflow diagram" />
               <figcaption>整体工作流</figcaption>
             </figure>
-            <figure>
+            <figure class="reveal">
               <img src="auto-eval.png" alt="Auto evaluation" />
               <figcaption>自动评估机制</figcaption>
             </figure>
@@ -163,17 +189,90 @@
         <div class="container">
           <h2>评估与日志</h2>
           <div class="grid">
-            <div class="card">
+            <div class="card reveal">
               <h3>自动评估</h3>
               <p>从连贯性、情感强度与整体质量等维度进行评估，并记录分数。</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>过程可追溯</h3>
               <p>按轮次存储摘要、转折点与一致性问题，便于复盘与对比实验。</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>实验资料</h3>
               <p>可结合 <code>benchmark-baseline/</code> 中的论文与日志进行扩展分析。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="results">
+        <div class="container">
+          <h2>结果与分析</h2>
+          <div class="grid">
+            <div class="card reveal">
+              <h3>示例运行摘要</h3>
+              <table class="result-table">
+                <thead>
+                  <tr>
+                    <th>指标</th>
+                    <th>数值</th>
+                    <th>来源</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>目标长度</td>
+                    <td>20,000 字</td>
+                    <td>示例任务</td>
+                  </tr>
+                  <tr>
+                    <td>实际长度</td>
+                    <td>13,790 字</td>
+                    <td>runs/20260118_112833</td>
+                  </tr>
+                  <tr>
+                    <td>迭代轮次</td>
+                    <td>8</td>
+                    <td>runs/20260118_112833</td>
+                  </tr>
+                  <tr>
+                    <td>最佳奖励分数</td>
+                    <td>0.795</td>
+                    <td>runs/20260118_112833</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="muted">注：数值来自仓库示例输出，后续可替换为系统性实验结果。</p>
+            </div>
+            <div class="card reveal">
+              <h3>消融计划（占位）</h3>
+              <table class="result-table small">
+                <thead>
+                  <tr>
+                    <th>设置</th>
+                    <th>一致性</th>
+                    <th>整体质量</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>完整系统</td>
+                    <td>待补</td>
+                    <td>待补</td>
+                  </tr>
+                  <tr>
+                    <td>去除记忆</td>
+                    <td>待补</td>
+                    <td>待补</td>
+                  </tr>
+                  <tr>
+                    <td>去除一致性检查</td>
+                    <td>待补</td>
+                    <td>待补</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p class="muted">建议在加入系统性评测后补齐表格。</p>
             </div>
           </div>
         </div>
@@ -250,15 +349,15 @@ set CODEX_API_KEY=your_key</code></pre>
             项目参考了长文本生成与叙事评估方向的代表性研究，仓库内附相关文献。
           </p>
           <div class="grid">
-            <div class="card">
+            <div class="card reveal">
               <h3>Generating Long-form Story</h3>
               <p>benchmark-baseline/2506.16445v1.pdf</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>Long-form Narrative Evaluation</h3>
               <p>benchmark-baseline/2410.02603v2.pdf</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>NAACL Long-form Systems</h3>
               <p>benchmark-baseline/2025.naacl-long.63.pdf</p>
             </div>
@@ -270,19 +369,30 @@ set CODEX_API_KEY=your_key</code></pre>
         <div class="container">
           <h2>限制与伦理</h2>
           <div class="grid">
-            <div class="card">
+            <div class="card reveal">
               <h3>内容一致性</h3>
               <p>长篇叙事仍可能出现风格漂移与局部逻辑跳跃，需要人工审校。</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>计算成本</h3>
               <p>多 Agent 与检索流程对算力与 API 配额有较高需求。</p>
             </div>
-            <div class="card">
+            <div class="card reveal">
               <h3>内容安全</h3>
               <p>建议结合平台内容安全策略与人工审核使用生成文本。</p>
             </div>
           </div>
+        </div>
+      </section>
+
+      <section class="section" id="references">
+        <div class="container">
+          <h2>参考文献</h2>
+          <ol class="reference-list">
+            <li>benchmark-baseline/2506.16445v1.pdf</li>
+            <li>benchmark-baseline/2410.02603v2.pdf</li>
+            <li>benchmark-baseline/2025.naacl-long.63.pdf</li>
+          </ol>
         </div>
       </section>
 
@@ -394,17 +504,17 @@ git push</code></pre>
       </div>
     </footer>
     <script>
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            entry.target.classList.add("in-view");
-          }
-        });
-      },
-      { threshold: 0.2 }
-    );
-    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+      const observer = new IntersectionObserver(
+        (entries) => {
+          entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+              entry.target.classList.add("in-view");
+            }
+          });
+        },
+        { threshold: 0.2 }
+      );
+      document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
     </script>
   </body>
 </html>
