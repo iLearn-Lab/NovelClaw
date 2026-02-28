@@ -1,0 +1,274 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Long-Story Agent · 协同式 RAG-Agent 长文本生成系统</title>
+    <meta
+      name="description"
+      content="多 Agent + RAG + 动态记忆 + 一致性检查的长文本生成系统，面向长篇小说与复杂叙事。"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="container header-inner">
+        <div class="brand">Long-Story Agent</div>
+        <nav class="nav">
+          <a href="#features">特性</a>
+          <a href="#architecture">架构</a>
+          <a href="#quickstart">快速开始</a>
+          <a href="#demo">效果示例</a>
+          <a href="#repo">仓库</a>
+          <a href="#deploy">部署</a>
+        </nav>
+        <a class="btn ghost" href="#quickstart">开始使用</a>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero" id="top">
+        <div class="container hero-grid">
+          <div class="hero-copy">
+            <p class="eyebrow">开源 · 多 Agent · RAG</p>
+            <h1>协同式 RAG-Agent 长文本生成系统</h1>
+            <p class="lead">
+              面向长篇小说与复杂叙事的多 Agent 协作框架，集成动态记忆、静态知识库、
+              一致性检查与实时编辑，稳定输出高质量长文本。
+            </p>
+            <div class="cta">
+              <a class="btn primary" href="#quickstart">快速开始</a>
+              <a class="btn" href="#architecture">查看架构</a>
+              <a class="btn" href="https://github.com/xiao-zi-chen/Long-Story-agent">GitHub 仓库</a>
+            </div>
+            <div class="meta">
+              <span>支持 DeepSeek / OpenAI / Codex</span>
+              <span>可扩展工作流与多种写作模式</span>
+            </div>
+          </div>
+          <div class="hero-card">
+            <div class="stat">
+              <p class="stat-label">核心能力</p>
+              <p class="stat-value">多 Agent 协作 + 记忆增强</p>
+            </div>
+            <div class="stat">
+              <p class="stat-label">输出场景</p>
+              <p class="stat-value">长篇小说 / 多章节叙事 / 创意写作</p>
+            </div>
+            <div class="stat">
+              <p class="stat-label">重点机制</p>
+              <p class="stat-value">转折点跟踪 + 一致性评估 + 实时修订</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="features">
+        <div class="container">
+          <h2>核心特性</h2>
+          <div class="grid features">
+            <div class="card">
+              <h3>多 Agent 协作</h3>
+              <p>剧情、人物、世界观、检索、评估、写作分工明确，提升长篇一致性。</p>
+            </div>
+            <div class="card">
+              <h3>动态记忆系统</h3>
+              <p>按章节与轮次写入向量记忆，支持持续检索与上下文强化。</p>
+            </div>
+            <div class="card">
+              <h3>静态知识库</h3>
+              <p>可导入领域资料，快速扩展世界观与细节密度。</p>
+            </div>
+            <div class="card">
+              <h3>一致性与转折点</h3>
+              <p>跨章节一致性检测 + 转折点追踪，避免剧情漂移。</p>
+            </div>
+            <div class="card">
+              <h3>实时编辑器</h3>
+              <p>自动识别需修订片段，按策略回写内容。</p>
+            </div>
+            <div class="card">
+              <h3>可控生成</h3>
+              <p>目标长度、章节规划、快速模式、评估间隔等可配置。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="architecture">
+        <div class="container">
+          <h2>系统架构</h2>
+          <p class="muted">
+            从任务分析、全局大纲、章节生成到一致性评估与修订的完整闭环。
+          </p>
+          <div class="media-grid">
+            <figure>
+              <img src="workflow.png" alt="Workflow diagram" />
+              <figcaption>整体工作流</figcaption>
+            </figure>
+            <figure>
+              <img src="auto-eval.png" alt="Auto evaluation" />
+              <figcaption>自动评估机制</figcaption>
+            </figure>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="quickstart">
+        <div class="container">
+          <h2>快速开始</h2>
+          <div class="steps">
+            <div>
+              <h3>1. 安装依赖</h3>
+              <pre><code>pip install -r requirements.txt</code></pre>
+            </div>
+            <div>
+              <h3>2. 配置 API Key</h3>
+              <pre><code>set DEEPSEEK_API_KEY=your_key
+# 或者
+set OPENAI_API_KEY=your_key
+set CODEX_API_KEY=your_key</code></pre>
+            </div>
+            <div>
+              <h3>3. 运行生成</h3>
+              <pre><code>python main.py</code></pre>
+            </div>
+          </div>
+          <div class="note">
+            <strong>提示：</strong>可在 <code>.env</code> 中设置环境变量；更多参数见下方配置表。
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="demo">
+        <div class="container">
+          <h2>效果示例</h2>
+          <div class="demo-grid">
+            <div class="demo-metrics">
+              <div class="metric">
+                <span class="label">示例主题</span>
+                <span class="value">科技比赛小说 · 2万字目标</span>
+              </div>
+              <div class="metric">
+                <span class="label">生成长度</span>
+                <span class="value">13,790 字</span>
+              </div>
+              <div class="metric">
+                <span class="label">迭代轮次</span>
+                <span class="value">8</span>
+              </div>
+              <div class="metric">
+                <span class="label">最佳奖励分数</span>
+                <span class="value">0.795</span>
+              </div>
+            </div>
+            <div class="demo-text">
+              <h3>片段预览</h3>
+              <p>
+                林深盯着手中那枚芯片，指尖传来金属特有的冰凉触感。芯片约指甲盖大小，
+                边缘有细微的磨损痕迹，表面蚀刻着星火杯的徽标——一颗被二进制代码环绕的燃烧星辰。
+              </p>
+              <p>
+                今天是父亲林远忌日后的第七天。他坐在窗边，窗外是第九区连绵的灰色建筑群，
+                空中轨道列车像银色蜈蚣在楼宇间穿行。
+              </p>
+              <p class="muted">（示例节选自本地 runs 目录输出）</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="config">
+        <div class="container">
+          <h2>关键配置</h2>
+          <div class="table">
+            <div class="row head">
+              <div>变量</div>
+              <div>说明</div>
+              <div>默认值</div>
+            </div>
+            <div class="row">
+              <div><code>LLM_PROVIDER</code></div>
+              <div>模型服务商</div>
+              <div>deepseek</div>
+            </div>
+            <div class="row">
+              <div><code>MODEL_NAME</code></div>
+              <div>模型名称</div>
+              <div>deepseek-chat / gpt-5.2</div>
+            </div>
+            <div class="row">
+              <div><code>VECTOR_DB_PATH</code></div>
+              <div>向量库根目录</div>
+              <div>./vector_db</div>
+            </div>
+            <div class="row">
+              <div><code>MAX_ITERATIONS</code></div>
+              <div>最大迭代轮次</div>
+              <div>60</div>
+            </div>
+            <div class="row">
+              <div><code>FAST_MODE</code></div>
+              <div>快速写作模式</div>
+              <div>0</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="repo">
+        <div class="container">
+          <h2>仓库与贡献</h2>
+          <p class="muted">
+            前端与后端同仓维护，欢迎提交 Issue 与 PR。
+          </p>
+          <div class="grid">
+            <div class="card">
+              <h3>克隆仓库</h3>
+              <pre><code>git clone https://github.com/xiao-zi-chen/Long-Story-agent.git</code></pre>
+            </div>
+            <div class="card">
+              <h3>提交前端</h3>
+              <pre><code>git add docs/index.html docs/styles.css
+git commit -m "Add project frontend"
+git push</code></pre>
+            </div>
+          </div>
+          <div class="cta">
+            <a class="btn primary" href="https://github.com/xiao-zi-chen/Long-Story-agent">打开仓库</a>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="deploy">
+        <div class="container">
+          <h2>GitHub Pages 部署</h2>
+          <ol class="deploy-list">
+            <li>将本项目推送到 GitHub 仓库。</li>
+            <li>进入仓库设置 → Pages → 选择 <code>docs/</code> 作为发布目录。</li>
+            <li>访问 <code>https://xiao-zi-chen.github.io/Long-Story-agent/</code> 即可查看页面。</li>
+            <li>如需自定义域名，创建 <code>docs/CNAME</code> 并写入域名。</li>
+          </ol>
+          <div class="note">
+            <strong>说明：</strong>这是纯静态前端，不会在浏览器内调用模型；如需在线生成，
+            可在后端增加 API 服务再对接前端。
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <div class="container footer-inner">
+        <div>
+          <strong>Long-Story Agent</strong>
+          <p class="muted">协同式长文本生成系统</p>
+        </div>
+        <div class="footer-links">
+          <a href="#top">返回顶部</a>
+          <a href="#quickstart">快速开始</a>
+          <a href="https://github.com/xiao-zi-chen/Long-Story-agent">GitHub</a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>
