@@ -16,6 +16,10 @@
   box-sizing: border-box;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   margin: 0;
   font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", system-ui, -apple-system, sans-serif;
@@ -102,6 +106,8 @@ img {
 
 .hero {
   padding: 64px 0 40px;
+  background: radial-gradient(circle at top left, rgba(29, 78, 216, 0.08), transparent 45%),
+    radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 50%);
 }
 
 .hero-grid {
@@ -198,6 +204,12 @@ img {
   border: 1px solid var(--border);
 }
 
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
 .section.alt .card {
   background: #fdfdfd;
 }
@@ -221,33 +233,51 @@ img {
   font-family: var(--serif);
 }
 
-.method-grid {
+.method-timeline {
+  margin-top: 20px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
-  margin-top: 18px;
+  position: relative;
 }
 
-.method-step {
+.method-item {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 18px;
+  align-items: start;
   background: var(--surface);
   border-radius: 14px;
-  padding: 18px;
+  padding: 18px 20px;
   border: 1px solid var(--border);
   position: relative;
 }
 
-.method-step .step {
+.method-item::before {
+  content: "";
+  position: absolute;
+  left: 30px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(29, 78, 216, 0.15);
+}
+
+.method-item .badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.8rem;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #e0e7ff;
+  color: var(--primary);
   font-weight: 700;
   letter-spacing: 0.08em;
-  color: var(--primary);
-  background: #e0e7ff;
-  border-radius: 999px;
-  padding: 4px 10px;
-  margin-bottom: 10px;
+}
+
+.method-item .content h3 {
+  margin: 0 0 8px;
+  font-family: var(--serif);
 }
 
 .media-grid {
@@ -335,6 +365,17 @@ code {
   border: 1px solid var(--border);
 }
 
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 .table {
   margin-top: 18px;
   border: 1px solid var(--border);
@@ -393,5 +434,26 @@ code {
   }
   .row {
     grid-template-columns: 1fr;
+  }
+  .method-item {
+    grid-template-columns: 1fr;
+  }
+  .method-item::before {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
+  .btn:hover,
+  .card:hover {
+    transform: none;
+    box-shadow: none;
   }
 }

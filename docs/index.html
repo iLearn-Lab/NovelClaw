@@ -22,6 +22,9 @@
           <a href="#evaluation">评估</a>
           <a href="#quickstart">复现</a>
           <a href="#demo">示例</a>
+          <a href="#related">相关工作</a>
+          <a href="#limitations">限制</a>
+          <a href="#citation">引用</a>
           <a href="#repo">仓库</a>
           <a href="#deploy">部署</a>
         </nav>
@@ -104,26 +107,34 @@
       <section class="section" id="method">
         <div class="container">
           <h2>方法概览</h2>
-          <div class="method-grid">
-            <div class="method-step">
-              <span class="step">01</span>
-              <h3>任务分析</h3>
-              <p>解析主题、类型与目标长度，建立可控的生成约束。</p>
+          <div class="method-timeline">
+            <div class="method-item reveal">
+              <div class="badge">01</div>
+              <div class="content">
+                <h3>任务分析</h3>
+                <p>解析主题、类型与目标长度，建立可控的生成约束。</p>
+              </div>
             </div>
-            <div class="method-step">
-              <span class="step">02</span>
-              <h3>全局与章节大纲</h3>
-              <p>生成全局叙事结构，并分解为章节级执行计划。</p>
+            <div class="method-item reveal">
+              <div class="badge">02</div>
+              <div class="content">
+                <h3>全局与章节大纲</h3>
+                <p>生成全局叙事结构，并分解为章节级执行计划。</p>
+              </div>
             </div>
-            <div class="method-step">
-              <span class="step">03</span>
-              <h3>多 Agent 生成</h3>
-              <p>写作 Agent 生成文本，检索与世界观 Agent 提供支撑材料。</p>
+            <div class="method-item reveal">
+              <div class="badge">03</div>
+              <div class="content">
+                <h3>多 Agent 生成</h3>
+                <p>写作 Agent 生成文本，检索与世界观 Agent 提供支撑材料。</p>
+              </div>
             </div>
-            <div class="method-step">
-              <span class="step">04</span>
-              <h3>一致性评估与修订</h3>
-              <p>评估生成内容，自动修订与回写记忆，形成闭环。</p>
+            <div class="method-item reveal">
+              <div class="badge">04</div>
+              <div class="content">
+                <h3>一致性评估与修订</h3>
+                <p>评估生成内容，自动修订与回写记忆，形成闭环。</p>
+              </div>
             </div>
           </div>
         </div>
@@ -232,6 +243,64 @@ set CODEX_API_KEY=your_key</code></pre>
         </div>
       </section>
 
+      <section class="section" id="related">
+        <div class="container">
+          <h2>相关工作</h2>
+          <p class="muted">
+            项目参考了长文本生成与叙事评估方向的代表性研究，仓库内附相关文献。
+          </p>
+          <div class="grid">
+            <div class="card">
+              <h3>Generating Long-form Story</h3>
+              <p>benchmark-baseline/2506.16445v1.pdf</p>
+            </div>
+            <div class="card">
+              <h3>Long-form Narrative Evaluation</h3>
+              <p>benchmark-baseline/2410.02603v2.pdf</p>
+            </div>
+            <div class="card">
+              <h3>NAACL Long-form Systems</h3>
+              <p>benchmark-baseline/2025.naacl-long.63.pdf</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section alt" id="limitations">
+        <div class="container">
+          <h2>限制与伦理</h2>
+          <div class="grid">
+            <div class="card">
+              <h3>内容一致性</h3>
+              <p>长篇叙事仍可能出现风格漂移与局部逻辑跳跃，需要人工审校。</p>
+            </div>
+            <div class="card">
+              <h3>计算成本</h3>
+              <p>多 Agent 与检索流程对算力与 API 配额有较高需求。</p>
+            </div>
+            <div class="card">
+              <h3>内容安全</h3>
+              <p>建议结合平台内容安全策略与人工审核使用生成文本。</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="citation">
+        <div class="container">
+          <h2>引用格式</h2>
+          <div class="card">
+            <pre><code>@misc{longstoryagent2026,
+  title        = {Long-Story Agent: Collaborative RAG-Agent for Long-form Generation},
+  author       = {xiao-zi-chen},
+  year         = {2026},
+  howpublished = {\\url{https://github.com/xiao-zi-chen/Long-Story-agent}},
+  note         = {Open-source project}
+}</code></pre>
+          </div>
+        </div>
+      </section>
+
       <section class="section" id="config">
         <div class="container">
           <h2>关键配置</h2>
@@ -324,5 +393,18 @@ git push</code></pre>
         </div>
       </div>
     </footer>
+    <script>
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add("in-view");
+          }
+        });
+      },
+      { threshold: 0.2 }
+    );
+    document.querySelectorAll(".reveal").forEach((el) => observer.observe(el));
+    </script>
   </body>
 </html>
