@@ -5,32 +5,33 @@
 body {
   background: #ffffff;
   color: #000000;
-  font-family: "Times New Roman", "Noto Serif SC", "Songti SC", serif;
+  font-family: "Times New Roman", serif;
 }
 
 .site-header,
-.hero,
+.page-glow,
 .scroll-progress,
-.hero-canvas,
-.footer-links,
 .btn,
-.nav,
-.cta {
+.menu-toggle,
+.footer-links {
   display: none !important;
 }
 
 .section {
-  padding: 12px 0 !important;
+  padding: 10px 0 !important;
 }
 
 .card,
-.abstract-card,
-.method-item,
-.demo-text {
+.code-card,
+.method-card,
+.media-card,
+.hero-panel {
   box-shadow: none !important;
   border: 1px solid #cccccc !important;
 }
 
-.reference-list {
-  padding-left: 18px;
+pre {
+  background: #f5f5f5 !important;
+  color: #000000 !important;
+  border: 1px solid #cccccc;
 }
