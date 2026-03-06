@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Login | Long Story Portal{% endblock %}
+{% block content %}
+<section class="auth-wrap">
+  <article class="card auth-card">
+    <h1>Welcome Back</h1>
+    <p class="muted">Sign in to manage your API keys and run generation jobs.</p>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/login" class="form-stack">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" name="password" required placeholder="At least 8 characters">
+      <button type="submit" class="btn btn-primary">Login</button>
+    </form>
+    <p class="muted">No account yet? <a href="/register">Create one</a></p>
+  </article>
+</section>
+{% endblock %}

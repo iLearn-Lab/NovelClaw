@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Register | Long Story Portal{% endblock %}
+{% block content %}
+<section class="auth-wrap">
+  <article class="card auth-card">
+    <h1>Create Account</h1>
+    <p class="muted">Use one account per team member to isolate keys and job history.</p>
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+    <form method="post" action="/register" class="form-stack">
+      <label>Email</label>
+      <input type="email" name="email" required placeholder="you@example.com">
+      <label>Password</label>
+      <input type="password" name="password" required placeholder="At least 8 characters">
+      <label>Confirm password</label>
+      <input type="password" name="confirm_password" required placeholder="Repeat password">
+      <button type="submit" class="btn btn-primary">Create account</button>
+    </form>
+    <p class="muted">Already have an account? <a href="/login">Login</a></p>
+  </article>
+</section>
+{% endblock %}

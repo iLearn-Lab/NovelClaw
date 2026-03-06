@@ -1,0 +1,316 @@
+{% extends "base.html" %}
+{% block title %}Job #{{ job.id }} | Long Story Portal{% endblock %}
+{% block content %}
+{% set snapshot = progress_snapshot|default({
+  "phase_label": "running",
+  "phase_note": "",
+  "elapsed_seconds": 0,
+  "idle_seconds": -1,
+  "current_chapter": 0,
+  "planned_total": 0,
+  "chapter_words": 0,
+  "total_words": 0,
+  "percent": 0,
+  "stalled": false,
+  "stall_reason": "",
+  "memory_counts": {
+    "outlines": 0,
+    "texts": 0,
+    "characters": 0,
+    "world_settings": 0,
+    "fact_cards": 0
+  }
+}, true) %}
+
+<section class="hero compact">
+  <h1>Job #{{ job.id }}</h1>
+  <p class="muted">Provider: {{ job.provider|upper }} | Status: <span id="job-status" class="pill pill-{{ job.status }}">{{ job.status }}</span></p>
+  {% if job.status in ["queued", "running"] %}
+  <form method="post" action="/jobs/{{ job.id }}/cancel" class="inline-form">
+    <button type="submit" class="btn btn-outline btn-xs">Cancel this job</button>
+  </form>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Job Input</h2>
+  <p class="idea-block">{{ job.idea }}</p>
+  <p class="muted">Run ID: {{ job.run_id if job.run_id else "-" }}</p>
+  <p class="muted">Output Path: {{ job.output_path if job.output_path else "-" }}</p>
+  <p>
+    <a class="btn btn-outline btn-xs" href="/jobs/{{ job.id }}/download/output">Download Full Output</a>
+    <a class="btn btn-outline btn-xs" href="/jobs/{{ job.id }}/download/chapters">Download All Chapters (.zip)</a>
+  </p>
+</section>
+
+<section class="card">
+  <h2>Execution Status</h2>
+  <p class="muted">
+    Phase: <strong id="phase-label">{{ snapshot.phase_label }}</strong> |
+    Elapsed: <strong id="elapsed-seconds">{{ snapshot.elapsed_seconds }}</strong>s |
+    Idle: <strong id="idle-seconds">{% if snapshot.idle_seconds >= 0 %}{{ snapshot.idle_seconds }}{% else %}-{% endif %}</strong>s
+  </p>
+  <p class="muted">
+    Current action: <strong id="phase-note">{{ snapshot.phase_note|default("-", true) }}</strong>
+  </p>
+  <p class="muted">
+    Chapter progress: <strong id="chapter-progress">{% if snapshot.current_chapter > 0 %}{{ snapshot.current_chapter }}/{{ snapshot.planned_total if snapshot.planned_total > 0 else '?' }}{% else %}-{% endif %}</strong> |
+    Chapter words: <strong id="chapter-words">{{ snapshot.chapter_words }}</strong> |
+    Total words: <strong id="total-words">{{ snapshot.total_words }}</strong>
+  </p>
+  <p class="muted">
+    Memory:
+    outlines=<strong id="mc-outlines">{{ snapshot.memory_counts.outlines if snapshot.memory_counts is defined and snapshot.memory_counts else 0 }}</strong>,
+    texts=<strong id="mc-texts">{{ snapshot.memory_counts.texts if snapshot.memory_counts is defined and snapshot.memory_counts else 0 }}</strong>,
+    characters=<strong id="mc-characters">{{ snapshot.memory_counts.characters if snapshot.memory_counts is defined and snapshot.memory_counts else 0 }}</strong>,
+    worlds=<strong id="mc-worlds">{{ snapshot.memory_counts.world_settings if snapshot.memory_counts is defined and snapshot.memory_counts else 0 }}</strong>,
+    facts=<strong id="mc-facts">{{ snapshot.memory_counts.fact_cards if snapshot.memory_counts is defined and snapshot.memory_counts else 0 }}</strong>
+  </p>
+  <div class="progress-track">
+    <div id="progress-bar" class="progress-bar" style="width: {{ snapshot.percent }}%;"></div>
+  </div>
+  <p id="stall-hint" class="muted {% if not snapshot.stalled %}hidden{% endif %}">{{ snapshot.stall_reason if snapshot.stalled else "" }}</p>
+</section>
+
+<section class="card">
+  <h2>Live Progress</h2>
+  <p class="muted">This is real worker output, not browser polling logs.</p>
+  <pre id="worker-log" class="log-box">{{ worker_log_text if worker_log_text else "No worker log yet." }}</pre>
+</section>
+
+<section class="card">
+  <h2>Progress Log</h2>
+  <pre id="progress-log" class="log-box">{{ progress_log_text if progress_log_text else "No progress log yet." }}</pre>
+</section>
+
+<section class="card">
+  <h2>Chapter Results</h2>
+  <p class="muted">Latest finalized content per chapter (auto-updates while job is running).</p>
+  <div id="chapters-wrap">
+    {% if chapter_outputs %}
+      {% for ch in chapter_outputs %}
+      <article class="chapter-item">
+        <h3>Chapter {{ ch.chapter }}</h3>
+        <p class="muted">Iteration {{ ch.iteration }} | {{ ch.filename }}</p>
+        <p><a class="btn btn-outline btn-xs" href="/jobs/{{ job.id }}/download/chapter/{{ ch.chapter }}">Download Chapter {{ ch.chapter }}</a></p>
+        <pre class="chapter-box" data-chapter="{{ ch.chapter }}">{{ ch.content }}</pre>
+      </article>
+      {% endfor %}
+    {% else %}
+      <p id="chapters-empty" class="muted">No chapter output yet.</p>
+    {% endif %}
+  </div>
+</section>
+
+{% if job.error_message %}
+<section class="card">
+  <h2>Error</h2>
+  <pre class="error-block">{{ job.error_message }}</pre>
+</section>
+{% endif %}
+
+{% if output_text %}
+<section class="card">
+  <h2>Generated Text</h2>
+  <p class="muted">Run ID: {{ job.run_id }}</p>
+  <div class="output-box">{{ output_text }}</div>
+</section>
+{% else %}
+<section class="card">
+  <h2>Result</h2>
+  <p class="muted">This job is still running, or has not produced output yet. Refresh this page in a few seconds.</p>
+</section>
+{% endif %}
+
+<a href="/dashboard" class="btn btn-outline">Back to dashboard</a>
+
+<script>
+  (function () {
+    const jobId = {{ job.id }};
+    const workerBox = document.getElementById("worker-log");
+    const progressBox = document.getElementById("progress-log");
+    const statusEl = document.getElementById("job-status");
+    const chaptersWrap = document.getElementById("chapters-wrap");
+    const phaseLabelEl = document.getElementById("phase-label");
+    const phaseNoteEl = document.getElementById("phase-note");
+    const elapsedEl = document.getElementById("elapsed-seconds");
+    const idleEl = document.getElementById("idle-seconds");
+    const chapterProgressEl = document.getElementById("chapter-progress");
+    const chapterWordsEl = document.getElementById("chapter-words");
+    const totalWordsEl = document.getElementById("total-words");
+    const progressBarEl = document.getElementById("progress-bar");
+    const stallHintEl = document.getElementById("stall-hint");
+    const mcOutlinesEl = document.getElementById("mc-outlines");
+    const mcTextsEl = document.getElementById("mc-texts");
+    const mcCharactersEl = document.getElementById("mc-characters");
+    const mcWorldsEl = document.getElementById("mc-worlds");
+    const mcFactsEl = document.getElementById("mc-facts");
+
+    let lastChaptersSignature = "";
+
+    function updateStatusClass(status) {
+      if (!statusEl) return;
+      statusEl.className = "pill pill-" + status;
+      statusEl.textContent = status;
+    }
+
+    function updateLogBox(el, text, emptyLabel) {
+      if (!el) return;
+      const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 40;
+      el.textContent = text || emptyLabel;
+      if (nearBottom) {
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+
+    function escapeHtml(value) {
+      return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    function buildChaptersSignature(chapters) {
+      if (!chapters || chapters.length === 0) return "";
+      return chapters.map((ch) => {
+        const chapter = ch.chapter ?? "";
+        const iter = ch.iteration ?? "";
+        const filename = ch.filename || "";
+        const length = (ch.content || "").length;
+        return `${chapter}:${iter}:${filename}:${length}`;
+      }).join("|");
+    }
+
+    function captureChapterScrollPositions() {
+      const map = {};
+      if (!chaptersWrap) return map;
+      chaptersWrap.querySelectorAll(".chapter-box[data-chapter]").forEach((el) => {
+        const chapter = el.getAttribute("data-chapter");
+        if (chapter) map[chapter] = el.scrollTop;
+      });
+      return map;
+    }
+
+    function restoreChapterScrollPositions(scrollMap) {
+      if (!chaptersWrap) return;
+      chaptersWrap.querySelectorAll(".chapter-box[data-chapter]").forEach((el) => {
+        const chapter = el.getAttribute("data-chapter");
+        if (chapter && Object.prototype.hasOwnProperty.call(scrollMap, chapter)) {
+          el.scrollTop = scrollMap[chapter];
+        }
+      });
+    }
+
+    function renderChapters(chapters) {
+      if (!chaptersWrap) return;
+      const signature = buildChaptersSignature(chapters);
+      if (signature === lastChaptersSignature) {
+        return;
+      }
+      const chapterBoxScroll = captureChapterScrollPositions();
+
+      if (!chapters || chapters.length === 0) {
+        chaptersWrap.innerHTML = '<p id="chapters-empty" class="muted">No chapter output yet.</p>';
+        lastChaptersSignature = signature;
+        return;
+      }
+
+      chaptersWrap.innerHTML = chapters.map((ch) => {
+        const chapterNo = Number(ch.chapter || 0);
+        const title = `Chapter ${chapterNo || "?"}`;
+        const meta = `Iteration ${Number(ch.iteration || 0)} | ${escapeHtml(ch.filename || "")}`;
+        const downloadHref = chapterNo > 0 ? `/jobs/${jobId}/download/chapter/${chapterNo}` : "#";
+        const downloadLabel = chapterNo > 0 ? `Download Chapter ${chapterNo}` : "Download Chapter";
+        return `
+          <article class="chapter-item">
+            <h3>${title}</h3>
+            <p class="muted">${meta}</p>
+            <p><a class="btn btn-outline btn-xs" href="${downloadHref}">${downloadLabel}</a></p>
+            <pre class="chapter-box" data-chapter="${chapterNo}">${escapeHtml(ch.content || "")}</pre>
+          </article>
+        `;
+      }).join("");
+
+      restoreChapterScrollPositions(chapterBoxScroll);
+      lastChaptersSignature = signature;
+    }
+
+    function renderSnapshot(snapshot) {
+      if (!snapshot) return;
+      if (phaseLabelEl) phaseLabelEl.textContent = snapshot.phase_label || "-";
+      if (phaseNoteEl) phaseNoteEl.textContent = snapshot.phase_note || "-";
+      if (elapsedEl) elapsedEl.textContent = String(snapshot.elapsed_seconds ?? 0);
+      if (idleEl) idleEl.textContent = snapshot.idle_seconds >= 0 ? String(snapshot.idle_seconds) : "-";
+      if (chapterProgressEl) {
+        const cur = snapshot.current_chapter || 0;
+        const total = snapshot.planned_total || "?";
+        chapterProgressEl.textContent = cur > 0 ? `${cur}/${total}` : "-";
+      }
+      if (chapterWordsEl) chapterWordsEl.textContent = String(snapshot.chapter_words ?? 0);
+      if (totalWordsEl) totalWordsEl.textContent = String(snapshot.total_words ?? 0);
+      if (progressBarEl) {
+        const pct = Math.max(0, Math.min(100, Number(snapshot.percent || 0)));
+        progressBarEl.style.width = `${pct}%`;
+      }
+      const mc = snapshot.memory_counts || {};
+      if (mcOutlinesEl) mcOutlinesEl.textContent = String(mc.outlines ?? 0);
+      if (mcTextsEl) mcTextsEl.textContent = String(mc.texts ?? 0);
+      if (mcCharactersEl) mcCharactersEl.textContent = String(mc.characters ?? 0);
+      if (mcWorldsEl) mcWorldsEl.textContent = String(mc.world_settings ?? 0);
+      if (mcFactsEl) mcFactsEl.textContent = String(mc.fact_cards ?? 0);
+      if (stallHintEl) {
+        if (snapshot.stalled) {
+          stallHintEl.classList.remove("hidden");
+          stallHintEl.textContent = snapshot.stall_reason || "Possible stall detected, please check worker logs.";
+        } else {
+          stallHintEl.classList.add("hidden");
+          stallHintEl.textContent = "";
+        }
+      }
+    }
+
+    async function pollChapters() {
+      try {
+        const resp = await fetch(`/jobs/${jobId}/chapters`, { cache: "no-store" });
+        if (!resp.ok) return;
+        const data = await resp.json();
+        renderChapters(data.chapters || []);
+      } catch (err) {
+        // ignore transient polling errors
+      }
+    }
+
+    async function pollLogs() {
+      try {
+        const resp = await fetch(`/jobs/${jobId}/logs`, { cache: "no-store" });
+        if (!resp.ok) return;
+        const data = await resp.json();
+
+        updateLogBox(workerBox, data.worker_log, "No worker log yet.");
+        updateLogBox(progressBox, data.progress_log, "No progress log yet.");
+        updateStatusClass(data.status || "unknown");
+        if (data.progress_snapshot) {
+          renderSnapshot(data.progress_snapshot);
+        }
+        await pollChapters();
+
+        if (["succeeded", "failed", "canceled"].includes(data.status)) {
+          setTimeout(() => window.location.reload(), 1000);
+          return;
+        }
+      } catch (err) {
+        // ignore transient polling errors
+      }
+      setTimeout(pollLogs, 2000);
+    }
+
+    renderSnapshot({{ snapshot|tojson }});
+    renderChapters({{ chapter_outputs|tojson }});
+    lastChaptersSignature = buildChaptersSignature({{ chapter_outputs|tojson }});
+
+    if (["queued", "running"].includes("{{ job.status }}")) {
+      pollLogs();
+    }
+  })();
+</script>
+{% endblock %}

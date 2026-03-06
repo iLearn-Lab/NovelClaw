@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Dashboard | Long Story Portal{% endblock %}
+{% block content %}
+<section class="hero">
+  <h1>Local Deployment Dashboard</h1>
+  <p class="muted">Multi-user access with encrypted API key storage and isolated generation tasks.</p>
+</section>
+
+{% if message %}
+<div class="alert alert-ok">{{ message }}</div>
+{% endif %}
+{% if error %}
+<div class="alert alert-error">{{ error }}</div>
+{% endif %}
+
+<section class="grid two-col">
+  <article class="card">
+    <h2>API Keys</h2>
+    <p class="muted">Each key is encrypted before writing to database.</p>
+    {% if providers %}
+    <div class="key-grid">
+      {% for provider in providers %}
+      <form method="post" action="/api-keys" class="key-form">
+        {% set spec = provider_specs.get(provider) %}
+        <h3>{{ spec.label if spec else provider|upper }}</h3>
+        <p class="muted">Base URL: {{ spec.base_url if spec else "-" }}</p>
+        <p class="muted">Model: {{ spec.model if spec else "-" }} | Mode: {{ spec.wire_api if spec else "chat" }}</p>
+        <p class="key-hint">
+          {% if cred_map.get(provider) %}
+            Saved: {{ cred_map.get(provider).key_hint }}
+          {% else %}
+            Not saved yet
+          {% endif %}
+        </p>
+        <input type="hidden" name="provider" value="{{ provider }}">
+        <input type="password" name="api_key" required placeholder="Paste API key for {{ provider }}">
+        <button type="submit" class="btn btn-outline">Save {{ provider|upper }} key</button>
+      </form>
+      {% endfor %}
+    </div>
+    {% else %}
+    <p class="muted">No providers available yet. Add one in <strong>Custom Providers</strong> below.</p>
+    {% endif %}
+  </article>
+
+  <article class="card">
+    <h2>Start Generation Job</h2>
+    {% if providers %}
+    <form method="post" action="/jobs" class="form-stack">
+      <label>Provider</label>
+      <select name="provider" required>
+        {% for provider in providers %}
+        {% set spec = provider_specs.get(provider) %}
+        <option value="{{ provider }}" {% if provider == default_provider %}selected{% endif %}>
+          {{ spec.label if spec else provider|upper }}
+        </option>
+        {% endfor %}
+      </select>
+      <label>Story idea</label>
+      <textarea name="idea" rows="8" required placeholder="Describe your story idea, style, and constraints..."></textarea>
+      <button type="submit" class="btn btn-primary">Create job</button>
+    </form>
+    {% else %}
+    <p class="muted">Please create at least one custom provider before starting a job.</p>
+    {% endif %}
+  </article>
+</section>
+
+<section class="card">
+  <h2>Custom Providers</h2>
+  <p class="muted">Add your own provider with custom base URL, model, and request mode.</p>
+  <form method="post" action="/providers" class="form-stack">
+    <label>Provider slug (a-z / 0-9 / _ / -)</label>
+    <input type="text" name="slug" required placeholder="e.g. moonshot" minlength="2" maxlength="32">
+    <label>Display label (optional)</label>
+    <input type="text" name="label" placeholder="e.g. MOONSHOT">
+    <label>Base URL</label>
+    <input type="text" name="base_url" required placeholder="https://api.example.com/v1">
+    <label>Model</label>
+    <input type="text" name="model" required placeholder="model-name">
+    <label>Wire mode</label>
+    <select name="wire_api">
+      <option value="chat" selected>chat.completions</option>
+      <option value="responses">responses</option>
+    </select>
+    <button type="submit" class="btn btn-outline">Save custom provider</button>
+  </form>
+
+  {% if custom_providers %}
+  <div class="table-wrap" style="margin-top: 1rem;">
+    <table>
+      <thead>
+        <tr>
+          <th>Slug</th>
+          <th>Label</th>
+          <th>Base URL</th>
+          <th>Model</th>
+          <th>Mode</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for p in custom_providers %}
+        <tr>
+          <td>{{ p.slug }}</td>
+          <td>{{ p.label if p.label else p.slug|upper }}</td>
+          <td>{{ p.base_url }}</td>
+          <td>{{ p.model }}</td>
+          <td>{{ p.wire_api }}</td>
+          <td>
+            <form method="post" action="/providers/{{ p.slug }}/delete" class="inline-form" onsubmit="return confirm('Delete custom provider {{ p.slug }}?');">
+              <button type="submit" class="btn btn-outline btn-xs">Delete</button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No custom providers yet.</p>
+  {% endif %}
+</section>
+
+<section class="card">
+  <h2>Recent Jobs</h2>
+  {% if jobs %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Provider</th>
+          <th>Status</th>
+          <th>Created</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for job in jobs %}
+        <tr>
+          <td>#{{ job.id }}</td>
+          {% set job_spec = provider_specs.get(job.provider) %}
+          <td>{{ job_spec.label if job_spec else job.provider|upper }}</td>
+          <td>
+            <span class="pill pill-{{ job.status }}">{{ job.status }}</span>
+          </td>
+          <td>{{ job.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+          <td>
+            <a href="/jobs/{{ job.id }}" class="link-btn">View</a>
+            {% if job.status in ["queued", "running"] %}
+            <form method="post" action="/jobs/{{ job.id }}/cancel" class="inline-form">
+              <button type="submit" class="btn btn-outline btn-xs">Cancel</button>
+            </form>
+            {% else %}
+            <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form" onsubmit="return confirm('Delete job #{{ job.id }} permanently? This cannot be undone.');">
+              <button type="submit" class="btn btn-outline btn-xs">Delete</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="muted">No jobs yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

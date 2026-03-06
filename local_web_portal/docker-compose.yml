@@ -1,0 +1,17 @@
+services:
+  long-story-portal:
+    build:
+      context: ..
+      dockerfile: local_web_portal/Dockerfile
+    container_name: long-story-portal
+    ports:
+      - "8010:8010"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/local_web_portal/data
+      - ./runs:/app/local_web_portal/runs
+      - ../runs:/app/runs
+      - ../vector_db:/app/vector_db
+    restart: unless-stopped
+
