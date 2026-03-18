@@ -19,9 +19,9 @@ start_local.cmd
 ## What The Launcher Handles For You
 
 - No manual `.env` setup is required for local startup.
-- The launcher auto-creates `.venv` when needed.
-- The launcher reinstalls both root and web-portal requirements.
-- The launcher checks that `local_web_portal.app.main:app` imports successfully before starting Uvicorn.
+- The launcher checks whether your current Python environment is usable.
+- The launcher validates that required modules and `local_web_portal.app.main:app` can be imported before starting Uvicorn.
+- The launcher does not auto-create `.venv` or auto-install dependencies anymore.
 - Embedding downloads are disabled by default during local startup.
 
 ## Python Support
@@ -30,9 +30,22 @@ Supported Python versions:
 
 - `3.10+`
 
-If you already have an old `.venv` created by Python `<3.10`, the launcher will recreate it automatically.
+If you already have an old `.venv` created by Python `<3.10`, recreate it manually before starting.
 
 ## Common Startup Commands
+
+Recommended manual setup:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install -r local_web_portal\requirements.txt
+.\start_local.ps1
+```
+
+If you have multiple Python installations, use whichever Python `3.10+` interpreter you actually want for this project before creating `.venv`.
 
 Optional flags:
 
@@ -72,16 +85,16 @@ That is not a blocker for local startup. The launcher and the web portal can run
 
 ### 3. Existing `.venv` was created by the wrong Python version
 
-Delete `.venv` and run the launcher again, or just rerun the launcher and let it recreate unsupported environments automatically.
+Delete `.venv`, recreate it manually with Python `3.10+`, reinstall dependencies, and rerun the launcher.
 
 ### 4. `ModuleNotFoundError` or import failure at startup
 
-Run the launcher again. It reinstalls:
+Install dependencies manually:
 
 - `requirements.txt`
 - `local_web_portal/requirements.txt`
 
-and checks that `local_web_portal.app.main:app` can be imported before starting the server.
+Then rerun the launcher, which will re-check imports before startup.
 
 ### 4a. PowerShell says `param` or a parameter assignment is invalid
 
