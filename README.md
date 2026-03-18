@@ -184,6 +184,18 @@ Why this is the recommended path:
 
 ### 🌐 Web Portal
 
+Manual environment preparation:
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip setuptools wheel
+python -m pip install -r requirements.txt
+python -m pip install -r local_web_portal\requirements.txt
+```
+
+Then start the portal:
+
 ```bash
 .\start_local.ps1
 ```
@@ -206,6 +218,7 @@ Operational notes:
 - local startup does not require manually creating `local_web_portal/.env`
 - supported Python target is `3.10+`
 - dependencies and virtual environment preparation are user-controlled
+- prepare `.venv` and install dependencies before running `.\start_local.ps1`
 - if an old `.venv` was created with an unsupported Python version, recreate the environment manually
 - for detailed local troubleshooting, see [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
 
