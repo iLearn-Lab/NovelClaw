@@ -9,17 +9,25 @@ $ErrorActionPreference = "Stop"
 Set-Location (Resolve-Path (Join-Path $PSScriptRoot ".."))
 
 function Get-PythonCommand {
+  if (Get-Command python -ErrorAction SilentlyContinue) {
+    try {
+      $pythonVersion = (& python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')").Trim()
+      if (Test-SupportedPythonVersion $pythonVersion) {
+        return @("python")
+      }
+    } catch {
+      # Fall through to py launcher probing.
+    }
+  }
+
   if (Get-Command py -ErrorAction SilentlyContinue) {
     foreach ($minor in (18..10)) {
       $candidate = "3.$minor"
-      & py "-$candidate" -c "import sys" 2>$null
+      cmd /c "py -$candidate -c ""import sys"" >nul 2>nul"
       if ($LASTEXITCODE -eq 0) {
         return @("py", "-$candidate")
       }
     }
-  }
-  if (Get-Command python -ErrorAction SilentlyContinue) {
-    return @("python")
   }
   throw "Python is not installed. Install Python 3.10 or newer first."
 }
