@@ -1,57 +1,126 @@
 # CoLong Idea Studio
 
 <div align="center">
+  <img src="docs/demo1.png" alt="CoLong Idea Studio dashboard" width="92%">
 
-**Collaborative long-form story generation with dynamic memory, chapter planning, and an idea copilot.**
+  <h3>Turn rough story ideas into chaptered, memory-aware long-form fiction.</h3>
+  <p>
+    Collaborative ideation, dynamic memory, chapter planning, and observable generation in one workflow.
+  </p>
 
-[Live Portal](https://colong-idea-studio.cloud) | [Project Page](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/) | [Chinese Docs](README.zh-CN.md) | [Local Web Guide](RUN_LOCAL_WEB.md)
+  <p>
+    <a href="https://colong-idea-studio.cloud"><img src="https://img.shields.io/badge/Live%20Portal-Open%20Now-0f766e?style=for-the-badge&logo=googlechrome&logoColor=white" alt="Live Portal"></a>
+    <a href="https://xiao-zi-chen.github.io/CoLong-Idea-Studio/"><img src="https://img.shields.io/badge/Project%20Page-Research%20Showcase-1d4ed8?style=for-the-badge&logo=githubpages&logoColor=white" alt="Project Page"></a>
+    <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/CN%20Docs-Read%20in%20Chinese-d946ef?style=for-the-badge" alt="Chinese Docs"></a>
+    <a href="RUN_LOCAL_WEB.md"><img src="https://img.shields.io/badge/Local%20Web-Startup%20Guide-f59e0b?style=for-the-badge&logo=readthedocs&logoColor=white" alt="Local Web Guide"></a>
+  </p>
 
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![FastAPI](https://img.shields.io/badge/Web-FastAPI-009688)
-![Vector DB](https://img.shields.io/badge/VectorDB-ChromaDB-orange)
-![Mode](https://img.shields.io/badge/Mode-Dynamic%20Memory%20First-success)
-![Workflow](https://img.shields.io/badge/Workflow-Chaptered%20Generation-purple)
+  <p>
+    <img src="https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat-square&logo=python&logoColor=white" alt="Python 3.10+">
+    <img src="https://img.shields.io/badge/FastAPI-Web%20Portal-009688?style=flat-square&logo=fastapi&logoColor=white" alt="FastAPI">
+    <img src="https://img.shields.io/badge/VectorDB-ChromaDB-F97316?style=flat-square" alt="ChromaDB">
+    <img src="https://img.shields.io/badge/Mode-Dynamic%20Memory%20First-16a34a?style=flat-square" alt="Dynamic Memory First">
+    <img src="https://img.shields.io/badge/Workflow-Chaptered%20Generation-7c3aed?style=flat-square" alt="Chaptered Generation">
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-111827?style=flat-square" alt="MIT License"></a>
+  </p>
 
+  <p>
+    <a href="#why-it-feels-different">Why It Feels Different</a> |
+    <a href="#showcase">Showcase</a> |
+    <a href="#quick-start">Quick Start</a> |
+    <a href="#architecture">Architecture</a> |
+    <a href="#runtime-artifacts">Runtime Artifacts</a>
+  </p>
 </div>
 
-`CoLong Idea Studio` is a memory-first agent framework for turning rough story ideas into long-form, chaptered output. Instead of generating everything in one shot, it keeps a working memory of outlines, summaries, characters, world settings, plot points, and fact cards, then re-injects that memory while later chapters are being written.
+## At A Glance
 
-The project is built for people who want more than a one-pass "write me a novel" prompt. It helps you refine the idea first, plan chapters, write with stronger continuity, and inspect what the system is doing while it runs.
+`CoLong Idea Studio` is not a one-shot "write me a novel" prompt wrapper. It is a structured story-generation workflow that helps you clarify the idea first, plan chapters, write with dynamic memory, and inspect the system while it runs.
 
-## Why It Stands Out
+That makes it better suited for:
 
-| Generic long-text generation | CoLong Idea Studio |
+- long-form fiction and serialized stories
+- worldbuilding-heavy projects
+- human-in-the-loop co-writing
+- experiments on memory-aware, agentic long-text generation
+
+<table>
+  <tr>
+    <td width="33%" valign="top">
+      <h3>Idea Copilot</h3>
+      <p>Before drafting starts, the system keeps asking targeted questions until the premise is strong enough to write from.</p>
+    </td>
+    <td width="33%" valign="top">
+      <h3>Dynamic Memory</h3>
+      <p>Outlines, summaries, facts, characters, and world settings are written back and reused across later chapters.</p>
+    </td>
+    <td width="33%" valign="top">
+      <h3>Observable Runs</h3>
+      <p>You can inspect progress logs, chapter outputs, and memory artifacts instead of treating generation like a black box.</p>
+    </td>
+  </tr>
+</table>
+
+## Why It Feels Different
+
+| Typical long-text setup | CoLong Idea Studio |
 |---|---|
-| Starts writing from a vague prompt | Uses an `Idea Copilot` loop to refine the premise before drafting |
-| Context is mostly prompt-only | Writes back outlines, summaries, settings, and facts into dynamic memory |
-| Later chapters often drift | Reuses typed memory to keep characters, setting, and plot commitments aligned |
-| Hard to inspect mid-run | Exposes `progress.log`, chapter files, and memory artifacts during generation |
+| Starts drafting from a vague prompt | Uses a collaborative `Idea Copilot` loop first |
+| Context is mostly whatever fits into one prompt | Builds context from typed dynamic memory and recent artifacts |
+| Later chapters drift or contradict earlier ones | Re-injects summaries, fact cards, outlines, characters, and world settings |
+| Hard to know what happened during generation | Exposes `progress.log`, chapter files, and memory index data |
+| Output feels "one pass" | Feels more like an iterative writing pipeline |
 
-## Preview
+## Showcase
 
-<p align="center">
-  <img src="docs/demo1.png" alt="CoLong dashboard preview" width="48%">
-  <img src="docs/demo2.png" alt="CoLong job detail preview" width="48%">
-</p>
+<div align="center">
+  <table>
+    <tr>
+      <td align="center" width="50%">
+        <img src="docs/demo1.png" alt="Dashboard preview" width="100%">
+        <br>
+        <sub>Dashboard: create jobs, manage runs, enter via web portal</sub>
+      </td>
+      <td align="center" width="50%">
+        <img src="docs/demo2.png" alt="Job detail preview" width="100%">
+        <br>
+        <sub>Job Detail: watch progress, inspect chapters, track generation</sub>
+      </td>
+    </tr>
+  </table>
 
-## What You Can Do
+  <img src="docs/auto-eval.png" alt="Automatic evaluation snapshot" width="92%">
+  <br>
+  <sub>Evaluation Snapshot: another layer of runtime visibility</sub>
+</div>
 
-- Refine a rough story idea with a collaborative `Idea Copilot` before formal writing starts.
-- Generate chaptered long-form fiction with dynamic memory carried across chapters.
-- Inspect outline creation, chapter planning, chapter-length targets, and memory writeback in `runs/<run_id>/progress.log`.
-- Run the system from a CLI or a local multi-user FastAPI web portal.
-- Keep each run's memory isolated under `vector_db/memory/run_<run_id>/`.
+## Flow
 
-## Best For
-
-- Long-form fiction and serialized stories
-- Worldbuilding-heavy projects
-- Human-in-the-loop co-writing workflows
-- Experiments on memory-aware or agentic story generation
+<table>
+  <tr>
+    <td width="25%" valign="top">
+      <h4>1. Clarify</h4>
+      <p>Start from a premise, theme, setting, or plot seed.</p>
+    </td>
+    <td width="25%" valign="top">
+      <h4>2. Plan</h4>
+      <p>Generate a global outline plus chapter-level plans.</p>
+    </td>
+    <td width="25%" valign="top">
+      <h4>3. Write</h4>
+      <p>Draft each chapter with dynamic memory context assembled from typed artifacts.</p>
+    </td>
+    <td width="25%" valign="top">
+      <h4>4. Reinforce</h4>
+      <p>Write summaries and fact cards back into memory for later chapters.</p>
+    </td>
+  </tr>
+</table>
 
 ## Quick Start
 
-### Option A: Local Web Portal
+<details open>
+<summary><b>Option A: Local Web Portal</b></summary>
 
 Recommended on Windows:
 
@@ -72,10 +141,10 @@ http://127.0.0.1:8010
 
 Why this path is recommended:
 
-- It checks that your Python version is supported (`3.10+`).
-- It validates that `local_web_portal.app.main:app` can be imported before startup.
-- It avoids common issues caused by the wrong global Python or `uvicorn`.
-- It disables embedding downloads by default during local startup.
+- checks Python compatibility (`3.10+`)
+- verifies `local_web_portal.app.main:app` before boot
+- avoids wrong global Python or wrong `uvicorn`
+- disables embedding downloads by default during local startup
 
 Optional flags:
 
@@ -84,9 +153,12 @@ Optional flags:
 .\start_local.ps1 -Reload
 ```
 
-### Option B: CLI
+</details>
 
-Create a root `.env` or export environment variables before running:
+<details>
+<summary><b>Option B: CLI</b></summary>
+
+Create a root `.env` or export environment variables:
 
 ```text
 LLM_API_KEY=your_api_key
@@ -94,7 +166,7 @@ LLM_PROVIDER=deepseek
 MODEL_NAME=deepseek-chat
 ```
 
-Accepted key aliases also include:
+Accepted key aliases:
 
 - `DEEPSEEK_API_KEY`
 - `OPENAI_API_KEY`
@@ -110,25 +182,44 @@ python -m pip install -r requirements.txt
 python main.py
 ```
 
-## How It Works
+</details>
 
-1. The user starts from a premise, setting, theme, or plot seed.
-2. The `Idea Copilot Agent` keeps asking targeted questions until the idea is ready.
-3. The system creates a global outline and chapter-level plans.
-4. Each chapter is written with dynamic memory context assembled from recent summaries, fact cards, outlines, characters, and world settings.
-5. New chapter summaries and fact cards are written back into memory for later chapters.
-6. Runtime artifacts are saved so the process remains inspectable instead of opaque.
+## What You Actually Get
 
-## Core Building Blocks
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Creative Workflow</h3>
+      <ul>
+        <li>Collaborative idea refinement</li>
+        <li>Global outline generation</li>
+        <li>Chapter-level planning</li>
+        <li>Long-form story drafting</li>
+      </ul>
+    </td>
+    <td width="50%" valign="top">
+      <h3>System Visibility</h3>
+      <ul>
+        <li>Progress logs during runtime</li>
+        <li>Chapter output files per run</li>
+        <li>Dynamic memory index per run</li>
+        <li>Inspectable planning and setting artifacts</li>
+      </ul>
+    </td>
+  </tr>
+</table>
 
-- `Collaborative ideation`: idea refinement is treated as an agent loop, not a shallow form helper.
-- `Dynamic memory first`: the system prioritizes dynamic memory over static retrieval for long-form writing.
-- `Typed memory assembly`: retrieved context is grouped by semantic role before prompt injection.
-- `Progress-log observability`: planning, outline, length targets, memory snapshots, and chapter progress are visible while the job runs.
+## Architecture
+
+<div align="center">
+  <img src="docs/workflow-diagram-colong-idea-studio.png" alt="CoLong Idea Studio workflow diagram" width="94%">
+</div>
+
+The workflow closes the loop between planning, writing, retrieval, storage, and reinjection so later chapters stay grounded in earlier narrative commitments.
 
 ## Runtime Artifacts
 
-These files are especially useful when debugging or inspecting a run:
+These are the most useful files when you want to inspect or debug a run:
 
 ```text
 runs/<run_id>/progress.log
@@ -148,13 +239,8 @@ Representative `progress.log` events:
 | `memory_snapshot` | Dynamic-memory snapshot |
 | `character_setting` / `world_setting` | Setting memory written back |
 
-## Architecture
-
-![CoLong Idea Studio Workflow Diagram](docs/workflow-diagram-colong-idea-studio.png)
-
-The workflow follows a closed loop of planning, writing, retrieval, storage, and reinjection so later chapters can stay aligned with earlier narrative commitments.
-
-## Repository Layout
+<details>
+<summary><b>Repository Layout</b></summary>
 
 ```text
 .
@@ -168,20 +254,30 @@ The workflow follows a closed loop of planning, writing, retrieval, storage, and
 `-- main.py                # CLI entry
 ```
 
-## Deployment Notes
+</details>
 
-- For deployment, prefer uploading source code and required docs only.
-- Do not ship historical runtime data such as `runs/*`, `vector_db/*`, `.venv/*`, or `__pycache__/*`.
-- Keep secrets in the real deployment environment instead of committing them.
-- If you expose the portal publicly, put it behind HTTPS and a reverse proxy.
+<details>
+<summary><b>Deployment Notes</b></summary>
+
+- Upload source code and required docs only.
+- Do not deploy historical runtime data such as `runs/*`, `vector_db/*`, `.venv/*`, or `__pycache__/*`.
+- Keep secrets in the real deployment environment.
+- Put the public web portal behind HTTPS and a reverse proxy.
 
 See [DEPLOY_WHITELIST.md](DEPLOY_WHITELIST.md) and [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md) for operator-focused details.
 
+</details>
+
 ## Documentation
 
-- Chinese README: [README.zh-CN.md](README.zh-CN.md)
+- Chinese docs: [README.zh-CN.md](README.zh-CN.md)
 - Research-style project page: [xiao-zi-chen.github.io/CoLong-Idea-Studio](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/)
 - Local portal guide: [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
+- License: [MIT](LICENSE)
+
+## License
+
+This project is released under the [MIT License](LICENSE).
 
 ## Citation
 

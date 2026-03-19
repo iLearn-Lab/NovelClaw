@@ -182,6 +182,11 @@ vector_db/memory/run_<run_id>/memory_index.json
 - 英文 README: [README.md](README.md)
 - 学术展示页: [xiao-zi-chen.github.io/CoLong-Idea-Studio](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/)
 - 本地门户启动说明: [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
+- 许可证: [MIT](LICENSE)
+
+## 许可证
+
+本项目采用 [MIT License](LICENSE)。
 
 ## 引用
 
