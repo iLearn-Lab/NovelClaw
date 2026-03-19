@@ -1,8 +1,6 @@
 # CoLong Idea Studio
 
 <div align="center">
-  <img src="docs/demo1.png" alt="CoLong Idea Studio dashboard" width="92%">
-
   <h3>Turn rough story ideas into chaptered, memory-aware long-form fiction.</h3>
   <p>
     Collaborative ideation, dynamic memory, chapter planning, and observable generation in one workflow.
@@ -26,7 +24,6 @@
 
   <p>
     <a href="#why-it-feels-different">Why It Feels Different</a> |
-    <a href="#showcase">Showcase</a> |
     <a href="#quick-start">Quick Start</a> |
     <a href="#architecture">Architecture</a> |
     <a href="#runtime-artifacts">Runtime Artifacts</a>
@@ -70,29 +67,6 @@ That makes it better suited for:
 | Later chapters drift or contradict earlier ones | Re-injects summaries, fact cards, outlines, characters, and world settings |
 | Hard to know what happened during generation | Exposes `progress.log`, chapter files, and memory index data |
 | Output feels "one pass" | Feels more like an iterative writing pipeline |
-
-## Showcase
-
-<div align="center">
-  <table>
-    <tr>
-      <td align="center" width="50%">
-        <img src="docs/demo1.png" alt="Dashboard preview" width="100%">
-        <br>
-        <sub>Dashboard: create jobs, manage runs, enter via web portal</sub>
-      </td>
-      <td align="center" width="50%">
-        <img src="docs/demo2.png" alt="Job detail preview" width="100%">
-        <br>
-        <sub>Job Detail: watch progress, inspect chapters, track generation</sub>
-      </td>
-    </tr>
-  </table>
-
-  <img src="docs/auto-eval.png" alt="Automatic evaluation snapshot" width="92%">
-  <br>
-  <sub>Evaluation Snapshot: another layer of runtime visibility</sub>
-</div>
 
 ## Flow
 
