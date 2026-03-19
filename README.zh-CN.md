@@ -2,183 +2,58 @@
 
 <div align="center">
 
-**动态记忆优先的协同式长篇创意与小说生成智能体框架**
+**面向长篇创作的协同式 Agent 写作框架：先共创想法，再分章生成，并用动态记忆维持一致性。**
 
-[在线体验 / Live Portal](https://colong-idea-studio.cloud) | [Project Page / 论文展示页](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/) | [English Documentation / 英文文档](README.md)
+[在线体验](https://colong-idea-studio.cloud) | [项目展示页](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/) | [English README](README.md) | [本地 Web 启动说明](RUN_LOCAL_WEB.md)
 
 ![Python](https://img.shields.io/badge/Python-3.10%2B-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-Web%20Portal-009688)
-![ChromaDB](https://img.shields.io/badge/VectorDB-ChromaDB-orange)
-![Mode](https://img.shields.io/badge/Runtime-Dynamic%20Memory--First-success)
-![Language](https://img.shields.io/badge/Language-%E7%AE%80%E4%BD%93%E4%B8%AD%E6%96%87-red)
-
-**✦ 强调学术表达、协同交互与部署可用性**  
-**✧ 面向长篇、分章、强一致性写作任务而设计 (*`-`*)**
-
-**🧠 动态记忆优先**  |  **🤝 协同式创意完善**  |  **📝 可观测日志**  |  **📚 长篇创意生成**
+![FastAPI](https://img.shields.io/badge/Web-FastAPI-009688)
+![Vector DB](https://img.shields.io/badge/VectorDB-ChromaDB-orange)
+![Mode](https://img.shields.io/badge/模式-动态记忆优先-success)
+![Workflow](https://img.shields.io/badge/流程-分章生成-purple)
 
 </div>
 
-## ✦ 摘要
+`CoLong Idea Studio` 不是“给我一个题材，直接一口气写完”的一次性生成器。它更像一个用于长篇创作的协作系统：先帮你把创意补完整，再生成全局大纲和章节计划，然后把章节摘要、人物设定、世界观设定、事实卡片等内容持续写回动态记忆，在后续章节继续取回使用。
 
-`CoLong Idea Studio` 面向长篇、分章、强一致性的创意写作与小说生成任务，采用**动态记忆优先**范式。  
-系统围绕“**规划 -> 写作 -> 检索 -> 存储 -> 回注**”构建闭环，使后续章节能够持续对齐前文已经形成的人物、设定、事实和叙事承诺。
+如果你在意长篇小说里的连续性、设定不漂移、章节间前后呼应，以及生成过程是否可观察，这个项目比普通长文本生成方式更合适。
 
-相较于高度依赖静态知识库的流程，本框架更强调：
+## 为什么它值得被关注
 
-1. **🤝 协同式创意完善**：在正式写作前，由智能体持续追问并细化用户创意。
-2. **🧠 动态记忆驱动生成**：在生成过程中持续回写并检索大纲、事实、人物设定、世界观设定和章节摘要。
-
-## 🌐 在线入口
-
-- 在线 Web 门户： [https://colong-idea-studio.cloud](https://colong-idea-studio.cloud)
-- 科研展示页： [https://xiao-zi-chen.github.io/CoLong-Idea-Studio/](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/)
-
-## 🖼️ 示例展示
-
-以下是两个界面示例：
-
-<table align="center">
-  <tr>
-    <td align="center" valign="top">
-      <img src="docs/demo1.png" alt="Demo 1" width="520">
-    </td>
-    <td align="center" valign="top">
-      <img src="docs/demo2.png" alt="Demo 2" width="520">
-    </td>
-  </tr>
-</table>
-
-## 🏛️ 论文展示页
-
-若需要查看更偏科研展示风格的项目主页，包括系统概览、工作流图、评测快照与仓库入口，请访问：
-
-- [CoLong Idea Studio Project Page](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/)
-
-## 🧩 系统架构
-
-![CoLong Idea Studio Workflow Diagram](docs/workflow-diagram-colong-idea-studio.png)
-
-当前仓库使用提供的工作流图片作为系统架构图，用于展示从协同式创意完善到动态记忆驱动章节生成的整体路径。
-
-## ✍️ 方法设计
-
-### 🧠 1) 动态记忆上下文构建
-
-写作提示上下文由以下三部分组成：
-
-1. 固定注入：滚动摘要、最近章节摘要、最近事实卡片。
-2. 语义检索：从动态记忆向量库中召回相关条目。
-3. 类型聚合：按人物、大纲、世界观、情节与事实卡片进行组织后再注入提示词。
-
-### 🤝 2) 协同式创意完善作为 Agent 过程
-
-创意阶段被实现为**Agent 级协同循环**，而不是简单的前端问答辅助。`Idea Copilot Agent` 会持续追问，直到用户明确确认创意已经足够成熟，可以进入正式写作阶段。
-
-典型协同路径如下：
-
-1. 用户给出初始题材、设定、主题或剧情种子。
-2. 智能体围绕冲突、设定、人物动机、叙事语气、结构和受众预期提出针对性问题。
-3. 用户逐轮补充与修正创意。
-4. 当用户明确确认后，系统将创意结果固化为更稳定的写作 brief，并进入大纲生成阶段。
-
-✧ 这一设计可显著降低创意输入过于粗糙导致的后续漂移问题，也更符合协同式长文本生成系统的研究定位 (o^_^o)
-
----
-
-## 📝 Progress Log 协议
-
-路径：
-
-```text
-runs/<run_id>/progress.log
-```
-
-事件行格式：
-
-```text
-[event] YYYY-MM-DD HH:MM:SS | <event_name> | chapter <n> | <detail>
-```
-
-结构化章节行：
-
-```text
-chapter=<n>, words=<w>, planned_total=<p>, target=<t>, min=<l>, max=<u>, topic=<topic>
-```
-
-典型事件：
-
-| 事件名 | 含义 |
+| 常见长文本生成方式 | CoLong Idea Studio |
 |---|---|
-| `global_outline` | 全局大纲落库 |
-| `chapter_outline_ready` | 章节大纲集合就绪 |
-| `chapter_plan` | 当前章节写作计划 |
-| `chapter_outline` | 当前章节大纲摘要 |
-| `chapter_length_plan` | 本章 target 与推断来源 |
-| `chapter_length_warning` | 实际字数偏离期望区间 |
-| `character_setting` | 人物设定写入 |
-| `world_setting` | 世界观设定写入 |
-| `memory_snapshot` | 动态记忆快照 |
-| `outline_character/world/retrieval` | 大纲阶段产物日志 |
+| 从一个很模糊的想法直接开始写 | 先通过 `Idea Copilot` 反复追问，把想法补完整 |
+| 上下文主要靠一次 prompt | 会把大纲、摘要、设定、事实持续写回动态记忆 |
+| 后面章节容易人设漂移、设定打架 | 用类型化记忆回注，维持人物、世界观、情节承诺的一致性 |
+| 跑起来像黑箱，很难知道系统做了什么 | 运行中可查看 `progress.log`、章节文件和记忆索引 |
 
-✦ Progress Log 被有意设计为更丰富、更透明的观测层，使用户不仅能看到生成结果，也能看到隐藏在生成后的大纲、计划、记忆和设定层信息 (=^.^=)
+## 界面预览
 
----
+<p align="center">
+  <img src="docs/demo1.png" alt="CoLong 仪表盘界面" width="48%">
+  <img src="docs/demo2.png" alt="CoLong 任务详情界面" width="48%">
+</p>
 
-## 🧠 动态记忆模型
+## 你可以用它做什么
 
-`memory_index.json` 维护以下桶：
+- 在正式写作前，用协同式 `Idea Copilot` 把模糊创意补成更稳定的写作 brief。
+- 生成按章节推进的长篇小说或连续故事。
+- 在运行时查看大纲生成、章节规划、章节长度目标、记忆写回等过程信号。
+- 通过 CLI 或本地多用户 Web 门户使用整套流程。
+- 为每次运行单独隔离动态记忆，便于复现实验和排查问题。
 
-- `texts`
-- `outlines`
-- `characters`
-- `world_settings`
-- `plot_points`
-- `fact_cards`
+## 特别适合这些场景
 
-说明：
+- 长篇小说、连载故事、章节化叙事
+- 世界观复杂、角色较多的创作项目
+- 人机协同创作流程
+- 动态记忆 / Agent 写作 / 长文本一致性相关实验
 
-1. `texts` 保存章节正文与阶段性文本产物。
-2. `outlines` 保存全局大纲、章节计划、章节摘要与滚动摘要。
-3. `fact_cards` 作为轻量事实约束，用于降低跨章节漂移。
+## 快速开始
 
-在当前配置思路下，项目更适合运行于**动态记忆优先模式**，静态 RAG 与静态知识模块可以在必要时被弱化甚至关闭，以避免对长篇创意生成造成不必要干扰。
+### 方案 A：本地 Web 门户
 
-## 📁 项目结构
-
-```text
-.
-├─ agents/                  # 写作、检索与协同创意 Agent
-├─ workflow/                # analyzer / organizer / executor
-├─ rag/                     # 动态记忆与检索逻辑
-├─ utils/                   # LLM 客户端与工具模块
-├─ local_web_portal/        # 多用户 FastAPI 门户
-├─ docs/                    # 图片与文档资源
-├─ config.py                # 配置中心
-└─ main.py                  # CLI 入口
-```
-
----
-
-## 🚀 快速启动
-
-### CLI
-
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# Linux/macOS
-# source .venv/bin/activate
-
-python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python main.py
-```
-
-### 🌐 Web 门户
-
-先手动准备虚拟环境与依赖：
+Windows 下推荐这样启动：
 
 ```powershell
 python -m venv .venv
@@ -186,56 +61,129 @@ python -m venv .venv
 python -m pip install --upgrade pip setuptools wheel
 python -m pip install -r requirements.txt
 python -m pip install -r local_web_portal\requirements.txt
-```
-
-然后使用仓库启动脚本：
-
-```bash
 .\start_local.ps1
 ```
 
-访问：
+启动后访问：
 
 ```text
 http://127.0.0.1:8010
 ```
 
-可选启动参数：
+为什么推荐这个入口：
+
+- 会先检查 Python 版本是否满足 `3.10+`
+- 会先验证 `local_web_portal.app.main:app` 是否能正常导入
+- 能避免全局 Python 或全局 `uvicorn` 用错导致的启动问题
+- 本地启动时默认关闭 embedding 下载，体验更稳定
+
+可选参数：
 
 ```powershell
 .\start_local.ps1 -BindHost 0.0.0.0 -Port 8010
 .\start_local.ps1 -Reload
 ```
 
-说明：
+### 方案 B：CLI
 
-- 本地启动不要求手动创建 `local_web_portal/.env`
-- 支持的 Python 版本为 `3.10+`
-- 虚拟环境和依赖安装由用户手动控制
-- 如果已有 `.venv` 使用了不受支持的 Python 版本，请手动重建
-- 详细排障说明见 [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
+运行前，先在项目根目录配置 `.env`，或直接写入环境变量：
 
----
+```text
+LLM_API_KEY=your_api_key
+LLM_PROVIDER=deepseek
+MODEL_NAME=deepseek-chat
+```
 
-## 📦 部署原则
+也兼容这些 API Key 变量名：
 
-面向服务器部署时，建议仅上传运行必需文件，并尽可能排除以下内容：
+- `DEEPSEEK_API_KEY`
+- `OPENAI_API_KEY`
+- `CODEX_API_KEY`
 
-1. 历史产物：`runs/*`
-2. 历史向量库：`vector_db/*`, `vector_db_tmp/*`
-3. 本地状态：`local_web_portal/data/*`
-4. 缓存与环境：`.venv/*`, `__pycache__/*`, `*.pyc`
+然后执行：
 
-这种白名单式部署策略可以减少仓库噪声、降低冷启动复杂度，并减少本地运行产物意外泄露的风险。
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python main.py
+```
 
-## 🌐 文档入口
+## 它是怎么工作的
 
-GitHub 默认落地页当前使用英文版，以提升公开展示时的可读性。  
-如需查看完整中文说明，请访问：
+1. 用户先提供一个题材、设定、主题或剧情种子。
+2. `Idea Copilot Agent` 持续追问，直到创意足够清晰，可以进入正式写作。
+3. 系统生成全局大纲和章节级计划。
+4. 写每一章时，会把最近摘要、事实卡片、大纲、人物设定、世界观设定等组合成动态记忆上下文。
+5. 新章节的摘要和事实又会写回记忆，供后续章节继续使用。
+6. 运行过程中会落盘日志和章节文件，让整个过程可检查、可追踪。
 
-- [README.zh-CN.md](README.zh-CN.md)
+## 核心能力
 
-## 📚 引用
+- `协同式创意完善`：不是表单问答，而是真正的 Agent 追问循环。
+- `动态记忆优先`：相比静态知识库，更强调写作过程中的记忆写回与再利用。
+- `类型化记忆装配`：人物、世界观、大纲、事实卡片会按类型组织后再注入 prompt。
+- `可观测进度日志`：可以看到大纲、计划、长度目标、记忆快照、章节推进等中间状态。
+
+## 关键运行产物
+
+调试和理解系统时，最值得看的文件通常是：
+
+```text
+runs/<run_id>/progress.log
+runs/<run_id>/output.txt
+runs/<run_id>/chapters/
+vector_db/memory/run_<run_id>/memory_index.json
+```
+
+`progress.log` 里的典型事件包括：
+
+| 事件 | 含义 |
+|---|---|
+| `global_outline` | 全局大纲已落盘 |
+| `chapter_outline_ready` | 章节大纲已准备完成 |
+| `chapter_plan` | 当前章节写作计划 |
+| `chapter_length_plan` | 当前章节目标长度及其推断来源 |
+| `memory_snapshot` | 动态记忆快照 |
+| `character_setting` / `world_setting` | 人物或世界观设定写回记忆 |
+
+## 系统流程图
+
+![CoLong Idea Studio Workflow Diagram](docs/workflow-diagram-colong-idea-studio.png)
+
+整体流程是一个闭环：规划、写作、检索、存储、回注。这样后续章节会持续受到前文已形成设定和叙事承诺的约束，而不是越写越散。
+
+## 仓库结构
+
+```text
+.
+|-- agents/                # 写作、检索、协同创意相关 Agent
+|-- workflow/              # analyzer / organizer / executor
+|-- rag/                   # 动态记忆与检索逻辑
+|-- utils/                 # LLM 客户端与通用工具
+|-- local_web_portal/      # 本地多用户 FastAPI 门户
+|-- docs/                  # 图示、截图与项目页素材
+|-- config.py              # 配置中心
+`-- main.py                # CLI 入口
+```
+
+## 部署建议
+
+- 部署时优先上传源码和必要文档，不要把历史运行产物一起带上去。
+- `runs/*`、`vector_db/*`、`.venv/*`、`__pycache__/*` 这类内容建议排除。
+- API Key 和密钥类配置应放在真实部署环境中，不要直接提交到仓库。
+- 如果对公网开放 Web 门户，建议放在 HTTPS 和反向代理之后。
+
+更细的运维说明可参考 [DEPLOY_WHITELIST.md](DEPLOY_WHITELIST.md) 和 [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)。
+
+## 更多文档
+
+- 英文 README: [README.md](README.md)
+- 学术展示页: [xiao-zi-chen.github.io/CoLong-Idea-Studio](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/)
+- 本地门户启动说明: [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
+
+## 引用
 
 ```bibtex
 @software{colong_idea_studio_2026,
