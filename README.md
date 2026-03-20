@@ -12,7 +12,11 @@
   <h3>Structured long-form story generation with collaborative ideation, chapter planning, and dynamic memory reinjection.</h3>
 
   <p>
-    CoLong Idea Studio turns rough ideas into inspectable, chaptered fiction pipelines instead of one-shot prompt outputs.
+    CoLong Idea Studio turns rough ideas into inspectable, chaptered fiction pipelines instead of one-shot prompt outputs. <code>(•̀ᴗ•́)و</code>
+  </p>
+
+  <p>
+    <b>Try it online now:</b> <a href="https://colong-idea-studio.cloud">colong-idea-studio.cloud</a> <code>✦◝(⁰▿⁰)◜✦</code>
   </p>
 
   <p>
@@ -36,11 +40,14 @@
   <img src="docs/hero.png" alt="CoLong Idea Studio hero image" width="100%">
 </p>
 
-## Overview
+> **Live Demo**
+> Visit **[colong-idea-studio.cloud](https://colong-idea-studio.cloud)** if you want the fastest way to try CoLong without missing the online portal. `ヽ(•‿•)ノ`
+
+## Overview `(•̀ᴗ•́)و`
 
 `CoLong Idea Studio` is a dynamic-memory-first workflow for long-form fiction generation. Instead of asking an LLM to write everything in one pass, it separates the process into collaborative ideation, global planning, chapter planning, chapter drafting, and memory write-back.
 
-That makes it a better fit for:
+That makes it a better fit for `(*•̀ㅂ•́)و`:
 
 - long novels and serialized fiction
 - worldbuilding-heavy stories with recurring facts and constraints
@@ -64,15 +71,15 @@ That makes it a better fit for:
   </tr>
 </table>
 
-## Visual Tour
+## Visual Tour `٩(ˊᗜˋ*)و`
 
 <p align="center">
   <img src="docs/readme-triptych-en.png" alt="From creative overload to structured collaboration to stable narratives" width="100%">
 </p>
 
-CoLong is designed around a simple claim: long-form writing quality improves when the system helps you move from raw creative overload to structured collaboration and then to stable narratives.
+CoLong is designed around a simple claim: long-form writing quality improves when the system helps you move from raw creative overload to structured collaboration and then to stable narratives. `(*^▽^*)`
 
-## Why It Stands Out
+## Why It Stands Out `✧(｡•̀ᴗ-)✧`
 
 <p align="center">
   <img src="docs/dynamic-memory.png" alt="Dynamic memory flow across summaries, fact cards, profiles, and chapter outputs" width="100%">
@@ -86,14 +93,14 @@ CoLong is designed around a simple claim: long-form writing quality improves whe
 | Generation is hard to inspect | Exposes `progress.log`, chapter files, and memory index data |
 | Feels like one-pass prompting | Feels like a staged narrative production pipeline |
 
-### Dynamic-Memory-First, In Practice
+### Dynamic-Memory-First, In Practice `ദ്ദി(˵ •̀ ᴗ - ˵ ) ✧`
 
 - chapter summaries become reusable memory for later chapters
 - fact cards preserve concrete story commitments
 - character and world settings are written back as separate typed artifacts
 - chapter drafting pulls from recent outputs plus structured memory, not just the latest prompt
 
-## Workflow
+## Workflow `╭( ･ㅂ･)و`
 
 <table>
   <tr>
@@ -116,14 +123,14 @@ CoLong is designed around a simple claim: long-form writing quality improves whe
   </tr>
 </table>
 
-## Best Use Cases
+## Best Use Cases `(*^_^*)`
 
 - serialized web fiction
 - long-form sci-fi or fantasy with dense world rules
 - collaborative authoring workflows where humans steer the premise and chapters
 - research and engineering work on narrative memory, chapter coherence, and agentic generation
 
-## Quick Start
+## Quick Start `ᕕ( ᐛ )ᕗ`
 
 <details open>
 <summary><b>Option A: Local Web Portal</b></summary>
@@ -143,6 +150,12 @@ Open:
 
 ```text
 http://127.0.0.1:8010
+```
+
+Or skip local setup and open the hosted portal:
+
+```text
+https://colong-idea-studio.cloud
 ```
 
 Optional flags:
@@ -190,7 +203,7 @@ python main.py
 
 </details>
 
-## What You Get
+## What You Get `(*•̀ᴗ•́*)و ̑̑`
 
 <table>
   <tr>
@@ -215,7 +228,7 @@ python main.py
   </tr>
 </table>
 
-## Architecture
+## Architecture `☆_☆`
 
 <p align="center">
   <img src="docs/workflow-diagram-colong-idea-studio.png" alt="CoLong Idea Studio workflow diagram" width="94%">
@@ -223,7 +236,7 @@ python main.py
 
 The architecture closes the loop between planning, writing, retrieval, storage, and reinjection so later chapters inherit earlier narrative commitments instead of drifting away from them.
 
-## Runtime Artifacts
+## Runtime Artifacts `૮ ˶ᵔ ᵕ ᵔ˶ ა`
 
 These are the most useful files when inspecting or debugging a run:
 
@@ -274,7 +287,7 @@ See [DEPLOY_WHITELIST.md](DEPLOY_WHITELIST.md) and [RUN_LOCAL_WEB.md](RUN_LOCAL_
 
 </details>
 
-## Documentation
+## Documentation `ヾ(•ω•)o`
 
 - Chinese docs: [README.zh-CN.md](README.zh-CN.md)
 - Research-style project page: [xiao-zi-chen.github.io/CoLong-Idea-Studio](https://xiao-zi-chen.github.io/CoLong-Idea-Studio/)
