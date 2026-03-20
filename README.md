@@ -294,13 +294,8 @@ See [DEPLOY_WHITELIST.md](DEPLOY_WHITELIST.md) and [RUN_LOCAL_WEB.md](RUN_LOCAL_
 - 🌐 Local portal guide: [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
 - ⚖️ License: [MIT](LICENSE)
 
-## Citation
+## Star Growth 📈
 
-```bibtex
-@software{colong_idea_studio_2026,
-  title        = {CoLong Idea Studio: A Dynamic-Memory-First Collaborative Agent Framework for Long-Form Creative Ideation and Story Generation},
-  author       = {xiao-zi-chen and contributors},
-  year         = {2026},
-  url          = {https://github.com/HITSZ-DS/CoLong-Idea-Studio}
-}
-```
+Track the repository's star growth here:
+
+[![Star History Chart](https://api.star-history.com/svg?repos=HITSZ-DS/CoLong-Idea-Studio&type=Date)](https://star-history.com/#HITSZ-DS/CoLong-Idea-Studio&Date)

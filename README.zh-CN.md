@@ -294,13 +294,8 @@ vector_db/memory/run_<run_id>/memory_index.json
 - 🌐 本地门户启动说明: [RUN_LOCAL_WEB.md](RUN_LOCAL_WEB.md)
 - ⚖️ 许可证: [MIT](LICENSE)
 
-## 引用
+## Star 增长趋势 📈
 
-```bibtex
-@software{colong_idea_studio_2026,
-  title        = {CoLong Idea Studio: A Dynamic-Memory-First Collaborative Agent Framework for Long-Form Creative Ideation and Story Generation},
-  author       = {xiao-zi-chen and contributors},
-  year         = {2026},
-  url          = {https://github.com/HITSZ-DS/CoLong-Idea-Studio}
-}
-```
+这里可以直接看到仓库的 Star 增长曲线：
+
+[![Star History Chart](https://api.star-history.com/svg?repos=HITSZ-DS/CoLong-Idea-Studio&type=Date)](https://star-history.com/#HITSZ-DS/CoLong-Idea-Studio&Date)
