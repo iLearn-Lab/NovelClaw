@@ -1,2 +1,0 @@
-"""Local web portal package."""
-
