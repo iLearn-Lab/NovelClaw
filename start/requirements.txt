@@ -1,0 +1,8 @@
+# 制作 (Created by)：sirvffg冷月笙寒
+# 网站 (Website)：https://lygalaxy.cn
+
+# 打包启动器所需的依赖
+PySide6>=6.6.0
+PySide6-Fluent-Widgets>=1.5.0
+pyinstaller>=6.0.0
+Pillow>=10.0.0
