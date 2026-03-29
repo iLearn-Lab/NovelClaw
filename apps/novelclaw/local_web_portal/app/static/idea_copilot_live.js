@@ -126,9 +126,11 @@
 
   function init(root) {
     if (!root) return;
+    if (root.dataset.liveInitialized === 'true') return;
     const form = root.querySelector('[data-idea-reply-form]');
     const feed = root.querySelector('[data-idea-feed]');
     if (!form || !feed) return;
+    root.dataset.liveInitialized = 'true';
     const layout = root.dataset.layout || "dashboard";
     const sessionId = root.dataset.sessionId || "";
     const labels = {
@@ -151,6 +153,8 @@
     let pollErrorCount = 0;
     let recoveryRedirect = false;
     let pollTicks = 0;
+    const MIN_PENDING_MS = 900;
+    const POST_SUCCESS_STATUS_MS = 1400;
 
     function scrollFeedToBottom() {
       if (!feed) return;
@@ -212,6 +216,10 @@
       node.hidden = false;
       node.className = `console-alert ${kind === 'error' ? 'error' : 'ok'}`;
       node.textContent = text;
+    }
+
+    function sleep(ms) {
+      return new Promise((resolve) => window.setTimeout(resolve, ms));
     }
 
     async function readPayload(response) {
@@ -338,10 +346,12 @@
       const payload = new FormData(form);
       setStatus('ok', '');
       setBusy(true);
+      const submitStartedAt = Date.now();
       feed.querySelector('[data-pending-row="1"]')?.remove();
       feed.insertAdjacentHTML('beforeend', renderUserMessage({ role: 'user', content: reply }, layout, labels));
       if (feed.lastElementChild) feed.lastElementChild.setAttribute('data-optimistic-user', '1');
       appendPending(feed, layout, labels);
+      setStatus('ok', labels.continuing);
       scrollFeedToBottom();
       if (textarea) textarea.value = '';
       try {
@@ -363,13 +373,21 @@
           ensurePendingVisual();
           startPolling({ forceUntilAssistant: true, maxTicks: 30 });
         } else {
+          const elapsed = Date.now() - submitStartedAt;
+          const remainingPending = Math.max(0, MIN_PENDING_MS - elapsed);
+          if (remainingPending > 0) {
+            await sleep(remainingPending);
+          }
           if (refreshWorkspaceWhenRunStarts(data)) {
             return;
           }
           renderMessages(feed, data.messages, layout, labels, true);
           scrollFeedToBottom();
           animateAssistant(feed, data.latest_turn);
-          setStatus('ok', '');
+          setStatus('ok', labels.continuing);
+          window.setTimeout(function () {
+            setStatus('ok', '');
+          }, POST_SUCCESS_STATUS_MS);
           setBusy(false);
         }
       } catch (error) {
@@ -411,5 +429,15 @@
   }
 
   window.initIdeaCopilotLive = init;
+
+  function autoInit() {
+    document.querySelectorAll('[data-idea-copilot-root]').forEach(init);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', autoInit, { once: true });
+  } else {
+    autoInit();
+  }
 })();
 
