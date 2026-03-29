@@ -1,35 +1,37 @@
-﻿{% extends "base.html" %}
-{% block title %}{{ ui_text('瀵硅瘽宸ヤ綔鍙?, 'Conversation Workspace') }} | NovelClaw{% endblock %}
+{% extends "base.html" %}
+{% block title %}{{ ui_text('对话工作台', 'Conversation Workspace') }} | NovelClaw{% endblock %}
 {% block content %}
 {% set session_suffix = '?session_id=' ~ active_session.id if active_session else '' %}
-<section class="chat-console-layout chat-console-layout--focus"
+<section
+  class="chat-console-layout chat-console-layout--focus"
   {% if chat_session %}
   data-idea-copilot-root
   data-layout="dashboard"
   data-session-id="{{ chat_session.id }}"
   data-reply-pending="{{ 'true' if session_state.reply_pending else 'false' }}"
-  data-label-you="{{ ui_text('浣?, 'You') }}"
-  data-label-thinking="{{ ui_text('姝ｅ湪鎬濊€?, 'Thinking') }}"
-  data-label-analysis-title="{{ ui_text('NovelClaw 鍒嗘瀽', 'NovelClaw analysis') }}"
-  data-label-next-questions="{{ ui_text('涓嬩竴姝ラ棶棰?, 'Next questions') }}"
-  data-label-current-brief="{{ ui_text('褰撳墠绠€鎶?, 'Current brief') }}"
-  data-label-next-answers="{{ ui_text('寤鸿琛ュ厖', 'Suggested next answers') }}"
-  data-label-readiness="{{ ui_text('鍑嗗搴?, 'Readiness') }}"
-  data-label-no-conversation="{{ ui_text('杩樻病鏈夊璇濊褰曘€?, 'No conversation yet.') }}"
-  data-label-empty-title="{{ ui_text('寮€濮嬫柊浼氳瘽', 'Start a new conversation') }}"
-  data-label-empty-body="{{ ui_text('杈撳叆鐩爣鍚庯紝NovelClaw 浼氬湪杩欓噷鎸佺画鍗忎綔銆?, 'NovelClaw will keep working here after you send the goal.') }}"
-  data-label-continuing="{{ ui_text('NovelClaw 姝ｅ湪缁х画澶勭悊...', 'NovelClaw is continuing...') }}"
-  data-label-run-started="{{ ui_text('姝ｅ紡鍐欎綔宸插惎鍔紝姝ｅ湪鍒囨崲鍒板疄鏃惰繍琛岃鍥?..', 'The writing run has started. Switching to live run view...') }}"
-  {% endif %}>
+  data-label-you="{{ ui_text('你', 'You') }}"
+  data-label-thinking="{{ ui_text('正在思考', 'Thinking') }}"
+  data-label-analysis-title="{{ ui_text('NovelClaw 分析', 'NovelClaw analysis') }}"
+  data-label-next-questions="{{ ui_text('下一步问题', 'Next questions') }}"
+  data-label-current-brief="{{ ui_text('当前简报', 'Current brief') }}"
+  data-label-next-answers="{{ ui_text('建议下一步回答：', 'Suggested next answers:') }}"
+  data-label-readiness="{{ ui_text('准备度', 'Readiness') }}"
+  data-label-no-conversation="{{ ui_text('还没有对话记录。', 'No conversation yet.') }}"
+  data-label-empty-title="{{ ui_text('开始新会话', 'Start a new conversation') }}"
+  data-label-empty-body="{{ ui_text('输入目标之后，NovelClaw 会在这里持续协作。', 'NovelClaw will keep working here after you send the goal.') }}"
+  data-label-continuing="{{ ui_text('NovelClaw 正在继续处理...', 'NovelClaw is continuing...') }}"
+  data-label-run-started="{{ ui_text('正式写作已启动，正在切换到实时运行视图...', 'The writing run has started. Switching to live run view...') }}"
+  {% endif %}
+>
   <div class="chat-stage chat-stage-full">
     <div class="chat-main-stack chat-main-stack--immersive">
       <header class="chat-hero-card chat-hero-card--compact">
         <div class="chat-hero-copy">
-          <div class="chat-hero-kicker">{{ ui_text('浠诲姟鍙?, 'Mission control') }}</div>
-          <h1>{{ ui_text('Claw 鍒涗綔鍙?, 'Claw Studio') }}</h1>
+          <div class="chat-hero-kicker">{{ ui_text('任务台', 'Mission control') }}</div>
+          <h1>{{ ui_text('Claw 创作台', 'Claw Studio') }}</h1>
           {% if chat_session %}
           {% set current_provider = provider_specs.get(chat_session.provider) %}
-          <div class="chat-hero-note">{{ ui_text('鎶婇渶姹傘€佷慨鏀瑰拰缁啓閮藉帇鍦ㄤ竴涓嚎绋嬮噷锛岄伩鍏嶅湪涓€鍫嗗悗鍙伴〉闈箣闂村弽澶嶅垏鎹€?, 'Keep briefs, revisions, and continue-writing prompts inside one thread instead of bouncing between admin-like pages.') }}</div>
+          <div class="chat-hero-note">{{ ui_text('将需求、修订与续写保持在同一条主线程中，避免在多个页面之间反复切换。', 'Keep briefs, revisions, and continuation prompts inside one main thread.') }}</div>
           <div class="chat-hero-meta">
             <span>#{{ chat_session.id }}</span>
             <span>{{ current_provider.label if current_provider else chat_session.provider|upper }}</span>
@@ -37,18 +39,18 @@
             <span>{{ chat_session.updated_at.strftime("%Y-%m-%d %H:%M") }}</span>
           </div>
           {% else %}
-          <div class="chat-hero-note">{{ ui_text('鍏堝紑涓€涓細璇濓紝鍐嶈 Claw 鍦ㄨ繖閲屾寔缁垎鏋愩€佹彁闂€佺敓鎴愬拰鎺ㄨ繘锛屼笉鍐嶅爢涓€灞忎綆浠峰€间俊鎭€?, 'Start one conversation and let Claw keep analyzing, asking, generating, and advancing here without filling the screen with low-value chrome.') }}</div>
+          <div class="chat-hero-note">{{ ui_text('先创建一个写作会话，再让 NovelClaw 在这里持续分析、提问、生成与推进。', 'Create a writing session first, then let NovelClaw continue working here.') }}</div>
           {% endif %}
         </div>
         <div class="chat-hero-actions">
-          <a href="{{ app_path('/console/chat') }}?new=1" class="primary-btn secondary">{{ ui_text('鏂板缓浼氳瘽', 'New conversation') }}</a>
+          <a href="{{ app_path('/console/chat') }}?new=1" class="primary-btn secondary">{{ ui_text('新建会话', 'New conversation') }}</a>
           {% if (not compose_new) and active_session %}
-          <form method="post" action="{{ app_path('/idea-copilot/' ~ active_session.id ~ '/delete') }}" class="inline-form" onsubmit="return confirm('{{ ui_text('纭畾鍒犻櫎褰撳墠浼氳瘽鍚楋紵姝ゆ搷浣滀笉鍙挙閿€銆?, 'Delete the current conversation? This cannot be undone.') }}');">
+          <form method="post" action="{{ app_path('/idea-copilot/' ~ active_session.id ~ '/delete') }}" class="inline-form" onsubmit="return confirm('{{ ui_text('确定删除当前会话吗？此操作无法撤销。', 'Delete the current conversation? This cannot be undone.') }}');">
             <input type="hidden" name="next" value="{{ app_path('/console/chat') }}?new=1">
-            <button type="submit" class="mini-btn danger">{{ ui_text('鍒犻櫎浼氳瘽', 'Delete') }}</button>
+            <button type="submit" class="mini-btn danger">{{ ui_text('删除', 'Delete') }}</button>
           </form>
           {% elif compose_new and active_session %}
-          <a href="{{ app_path('/console/chat') }}?session_id={{ active_session.id }}" class="ghost-btn">{{ ui_text('杩斿洖褰撳墠浼氳瘽', 'Back to current') }}</a>
+          <a href="{{ app_path('/console/chat') }}?session_id={{ active_session.id }}" class="ghost-btn">{{ ui_text('返回当前会话', 'Back to current') }}</a>
           {% endif %}
         </div>
       </header>
@@ -58,35 +60,26 @@
           {% if chat_session %}
           {% set current_provider = provider_specs.get(chat_session.provider) %}
           <section class="chat-side-card chat-side-card--hero">
-            <div class="chat-side-kicker">{{ ui_text('褰撳墠绠€鎶?, 'Current brief') }}</div>
+            <div class="chat-side-kicker">{{ ui_text('当前简报', 'Current brief') }}</div>
             <div class="chat-side-headline">
-              <div class="chat-side-title">{{ ui_text('浠诲姟鐒︾偣', 'Mission focus') }}</div>
-              <button type="button" class="inline-edit-btn" onclick="toggleBriefEdit(this)">{{ ui_text('缂栬緫', 'Edit') }}</button>
+              <div class="chat-side-title">{{ ui_text('任务焦点', 'Mission focus') }}</div>
             </div>
             <div class="chat-brief-block" data-refined-idea>{{ latest_turn.refined_idea or chat_session.refined_idea or chat_session.original_idea }}</div>
-            <div class="inline-edit-form" id="brief-edit-form">
-              <textarea id="brief-edit-text" rows="5">{{ latest_turn.refined_idea or chat_session.refined_idea or chat_session.original_idea }}</textarea>
-              <div class="inline-edit-actions">
-                <span class="inline-status" id="brief-edit-status"></span>
-                <button type="button" class="inline-cancel-btn" onclick="toggleBriefEdit(document.querySelector('.inline-edit-btn'))">{{ ui_text('鍙栨秷', 'Cancel') }}</button>
-                <button type="button" class="inline-save-btn" onclick="saveBrief({{ chat_session.id }})">{{ ui_text('淇濆瓨', 'Save') }}</button>
-              </div>
-            </div>
             <div class="chat-mini-grid">
               <div class="chat-mini-stat">
-                <span>{{ ui_text('杞', 'Rounds') }}</span>
+                <span>{{ ui_text('轮次', 'Rounds') }}</span>
                 <strong data-round-count>{{ chat_session.round_count }}</strong>
               </div>
               <div class="chat-mini-stat">
-                <span>{{ ui_text('鐘舵€?, 'Status') }}</span>
+                <span>{{ ui_text('状态', 'Status') }}</span>
                 <strong>{{ session_status_text(chat_session.status) }}</strong>
               </div>
               <div class="chat-mini-stat">
-                <span>{{ ui_text('妯″瀷', 'Provider') }}</span>
+                <span>{{ ui_text('模型', 'Provider') }}</span>
                 <strong>{{ current_provider.label if current_provider else chat_session.provider|upper }}</strong>
               </div>
               <div class="chat-mini-stat">
-                <span>{{ ui_text('璁板繂', 'Memory') }}</span>
+                <span>{{ ui_text('记忆', 'Memory') }}</span>
                 <strong>{{ status_summary.memory_count }}</strong>
               </div>
             </div>
@@ -94,7 +87,7 @@
           </section>
 
           <section class="chat-side-card">
-            <div class="chat-side-kicker">{{ ui_text('涓嬩竴姝?, 'Next') }}</div>
+            <div class="chat-side-kicker">{{ ui_text('下一步', 'Next') }}</div>
             {% if latest_turn.questions %}
             <ol class="chat-side-list">
               {% for q in latest_turn.questions %}
@@ -102,38 +95,38 @@
               {% endfor %}
             </ol>
             {% else %}
-            <div class="chat-side-note">{{ ui_text('褰撳墠娌℃湁寰呰ˉ鍏呴棶棰橈紝鍙互鐩存帴缁х画鎺ㄨ繘銆?, 'There are no pending questions right now. You can continue directly.') }}</div>
+            <div class="chat-side-note">{{ ui_text('当前没有待补充问题，可以直接继续推进。', 'There are no pending questions right now. You can continue directly.') }}</div>
             {% endif %}
           </section>
 
           <section class="chat-side-card">
-            <div class="chat-side-kicker">{{ ui_text('蹇€熻烦杞?, 'Quick jump') }}</div>
+            <div class="chat-side-kicker">{{ ui_text('快捷跳转', 'Quick jump') }}</div>
             <div class="chat-side-actions">
-              <a href="{{ app_path('/console/storyboard') }}{{ session_suffix }}" class="ghost-btn">{{ ui_text('鏁呬簨鏉?, 'Storyboard') }}</a>
-              <a href="{{ app_path('/console/manuscript/read') }}{{ session_suffix }}" class="ghost-btn">{{ ui_text('闃呰绋夸欢', 'Read draft') }}</a>
-              <a href="{{ app_path('/console/memory/banks') }}{{ session_suffix }}" class="ghost-btn">{{ ui_text('璁板繂搴?, 'Memory') }}</a>
+              <a href="{{ app_path('/console/storyboard') }}{{ session_suffix }}" class="ghost-btn">{{ ui_text('故事板', 'Storyboard') }}</a>
+              <a href="{{ app_path('/console/manuscript/read') }}{{ session_suffix }}" class="ghost-btn">{{ ui_text('阅读稿件', 'Read draft') }}</a>
+              <a href="{{ app_path('/console/memory/banks') }}{{ session_suffix }}" class="ghost-btn">{{ ui_text('记忆库', 'Memory') }}</a>
             </div>
           </section>
           {% else %}
           <section class="chat-side-card chat-side-card--empty">
-            <div class="chat-side-kicker">{{ ui_text('寮€濮?, 'Start') }}</div>
-            <div class="chat-side-title">{{ ui_text('鍏堢粰涓€涓槑纭换鍔?, 'Start with a clear mission') }}</div>
-            <div class="chat-side-note">{{ ui_text('杈撳叆棰樻潗銆佽鑹层€侀鏍笺€佺害鏉燂紝鎴栬€呯洿鎺ヨ瀹冨紑濮嬪啓銆備細璇濅竴鏃﹀缓绔嬶紝鍚庣画鎺ㄨ繘閮戒細鐣欏湪杩欎釜涓荤嚎绋嬮噷銆?, 'Describe genre, cast, tone, and constraints, or directly tell it to start writing. Once the conversation exists, all follow-up work stays in this main thread.') }}</div>
+            <div class="chat-side-kicker">{{ ui_text('开始', 'Start') }}</div>
+            <div class="chat-side-title">{{ ui_text('先给一个明确任务', 'Start with a clear mission') }}</div>
+            <div class="chat-side-note">{{ ui_text('输入题材、角色、风格和约束，或者直接告诉 NovelClaw 开始创作。', 'Describe genre, cast, tone, and constraints, or simply tell NovelClaw to start.') }}</div>
             <div class="chat-mini-grid">
               <div class="chat-mini-stat">
-                <span>{{ ui_text('妯″紡', 'Mode') }}</span>
+                <span>{{ ui_text('模式', 'Mode') }}</span>
                 <strong>{{ status_summary.agent_mode }}</strong>
               </div>
               <div class="chat-mini-stat">
-                <span>{{ ui_text('浠诲姟', 'Jobs') }}</span>
+                <span>{{ ui_text('任务', 'Jobs') }}</span>
                 <strong>{{ status_summary.running_jobs }}</strong>
               </div>
               <div class="chat-mini-stat">
-                <span>{{ ui_text('璁板繂', 'Memory') }}</span>
+                <span>{{ ui_text('记忆', 'Memory') }}</span>
                 <strong>{{ status_summary.memory_count }}</strong>
               </div>
               <div class="chat-mini-stat">
-                <span>{{ ui_text('绔犺妭', 'Chapters') }}</span>
+                <span>{{ ui_text('章节', 'Chapters') }}</span>
                 <strong>{{ status_summary.chapter_outputs }}</strong>
               </div>
             </div>
@@ -142,13 +135,13 @@
 
           {% if idea_sessions %}
           <section class="chat-side-card">
-            <div class="chat-side-kicker">{{ ui_text('鏈€杩戜細璇?, 'Recent sessions') }}</div>
+            <div class="chat-side-kicker">{{ ui_text('最近会话', 'Recent sessions') }}</div>
             <div class="chat-session-list">
               {% for session in idea_sessions[:5] %}
               {% set session_provider = provider_specs.get(session.provider) %}
               <a href="{{ app_path('/console/chat') }}?session_id={{ session.id }}" class="chat-session-item {% if active_session and session.id == active_session.id and not compose_new %}is-active{% endif %}">
-                <strong>#{{ session.id }} 路 {{ session_provider.label if session_provider else session.provider|upper }}</strong>
-                <span>{{ session.updated_at.strftime("%m-%d %H:%M") }} 路 {{ session_status_text(session.status) }}</span>
+                <strong>#{{ session.id }} | {{ session_provider.label if session_provider else session.provider|upper }}</strong>
+                <span>{{ session.updated_at.strftime("%m-%d %H:%M") }} | {{ session_status_text(session.status) }}</span>
               </a>
               {% endfor %}
             </div>
@@ -160,13 +153,13 @@
           <div class="chat-thread-card chat-thread-card--command">
             <div class="chat-thread-head">
               <div>
-                <div class="chat-thread-kicker">{{ ui_text('涓荤嚎绋?, 'Main thread') }}</div>
-                <h2>{{ ui_text('瀵硅瘽娴?, 'Conversation') }}</h2>
+                <div class="chat-thread-kicker">{{ ui_text('主线程', 'Main thread') }}</div>
+                <h2>{{ ui_text('对话流', 'Conversation') }}</h2>
               </div>
               {% if chat_session %}
               {% set current_provider = provider_specs.get(chat_session.provider) %}
               <div class="chat-thread-pills">
-                <span class="slim-pill">{{ ui_text('杞', 'Rounds') }} {{ chat_session.round_count }}</span>
+                <span class="slim-pill">{{ ui_text('轮次', 'Rounds') }} {{ chat_session.round_count }}</span>
                 <span class="slim-pill">{{ session_status_text(chat_session.status) }}</span>
                 <span class="slim-pill">{{ current_provider.label if current_provider else chat_session.provider|upper }}</span>
               </div>
@@ -185,18 +178,18 @@
                     <div class="avatar-circle">WC</div>
                     <div class="assistant-panel">
                       <div class="assistant-section">
-                        <div class="assistant-title">{{ ui_text('NovelClaw 鍒嗘瀽', 'NovelClaw analysis') }}</div>
+                        <div class="assistant-title">{{ ui_text('NovelClaw 分析', 'NovelClaw analysis') }}</div>
                         <div class="assistant-text">{{ msg.analysis }}</div>
                       </div>
                       {% if msg.questions %}
                       <div class="assistant-section split-line">
-                        <div class="assistant-title">{{ ui_text('涓嬩竴姝ラ棶棰?, 'Next questions') }}</div>
+                        <div class="assistant-title">{{ ui_text('下一步问题', 'Next questions') }}</div>
                         <ol class="question-list">{% for q in msg.questions %}<li>{{ q }}</li>{% endfor %}</ol>
                       </div>
                       {% endif %}
                       {% if msg.refined_idea %}
                       <div class="assistant-section split-line">
-                        <div class="assistant-title">{{ ui_text('褰撳墠绠€鎶?, 'Current brief') }}</div>
+                        <div class="assistant-title">{{ ui_text('当前简报', 'Current brief') }}</div>
                         <div class="assistant-text" data-refined-idea>{{ msg.refined_idea }}</div>
                       </div>
                       {% endif %}
@@ -205,7 +198,7 @@
                   {% elif msg.role == "user" %}
                   <div class="chat-row user">
                     <div class="user-bubble">{{ msg.content }}</div>
-                    <div class="user-tag">{{ ui_text('浣?, 'You') }}</div>
+                    <div class="user-tag">{{ ui_text('你', 'You') }}</div>
                   </div>
                   {% endif %}
                 {% endfor %}
@@ -214,8 +207,8 @@
                 <div class="avatar-circle">WC</div>
                 <div class="assistant-panel">
                   <div class="assistant-section">
-                    <div class="assistant-title">{{ ui_text('寮€濮嬫柊浼氳瘽', 'Start a new conversation') }}</div>
-                    <div class="assistant-text">{{ ui_text('鍏堝湪涓嬫柟杈撳叆闇€姹傦紝鍚庣画瀵硅瘽鍜屽啓浣滈兘浼氭寔缁暀鍦ㄨ繖涓富绾跨▼涓€?, 'Use the composer below to start. The full collaboration stays in this main thread.') }}</div>
+                    <div class="assistant-title">{{ ui_text('开始新会话', 'Start a new conversation') }}</div>
+                    <div class="assistant-text">{{ ui_text('先在下方输入需求，后续协作都会留在这个主线程里。', 'Use the composer below to start. The full collaboration stays in this main thread.') }}</div>
                   </div>
                 </div>
               </div>
@@ -234,21 +227,21 @@
             {% if chat_session and chat_session.status == 'active' and not compose_new %}
             <form method="post" action="{{ app_path('/idea-copilot/' ~ chat_session.id ~ '/reply') }}" class="chat-input-form chat-input-form--floating" data-idea-reply-form>
               <div data-idea-status class="console-alert" hidden></div>
-              <textarea name="reply" rows="4" required placeholder="{{ ui_text('缁х画琛ュ厖瑕佹眰銆佷慨鏀规柟鍚戯紝鎴栬€呯洿鎺ュ憡璇?NovelClaw 涓嬩竴姝ュ仛浠€涔堛€?, 'Add details, change direction, or tell NovelClaw what to do next.') }}"></textarea>
+              <textarea name="reply" rows="4" required placeholder="{{ ui_text('继续补充需求、修改方向，或者直接告诉 NovelClaw 下一步做什么。', 'Add details, change direction, or tell NovelClaw what to do next.') }}"></textarea>
               <div class="chat-input-actions">
-                <button type="submit" class="primary-btn">{{ ui_text('鍙戦€?, 'Send') }}</button>
-                <a href="{{ app_path('/console/chat') }}?new=1" class="ghost-btn">{{ ui_text('鏂板缓浼氳瘽', 'New conversation') }}</a>
+                <button type="submit" class="primary-btn">{{ ui_text('发送', 'Send') }}</button>
+                <a href="{{ app_path('/console/chat') }}?new=1" class="ghost-btn">{{ ui_text('新建会话', 'New conversation') }}</a>
               </div>
             </form>
             {% elif chat_session and chat_session.final_job_id %}
-            <div class="chat-run-passive-note">{{ ui_text('杩愯涓殑鎻愰棶銆佷腑閫旀墦鏂€佺珷鑺傜画鍐欓兘鐣欏湪杩欎竴椤靛畬鎴愩€?, 'Runtime questions, interrupts, and chapter continuation all stay on this page.') }}</div>
+            <div class="chat-run-passive-note">{{ ui_text('运行中的追问、中途打断与章节续写都会在这一页完成。', 'Runtime questions, interrupts, and chapter continuation all stay on this page.') }}</div>
             {% else %}
             <form method="post" action="{{ app_path('/idea-copilot/start') }}" class="chat-input-form chat-input-form--floating" id="new-session-form">
               {% if modelless_mode %}
               <div class="empty-note">{{ modelless_notice }}</div>
               {% elif providers %}
               <div class="chat-input-topline">
-                <label class="muted" for="provider-select">{{ ui_text('妯″瀷', 'Provider') }}</label>
+                <label class="muted" for="provider-select">{{ ui_text('模型', 'Provider') }}</label>
                 <select id="provider-select" name="provider" required>
                   {% for provider in providers %}
                   {% set spec = provider_specs.get(provider) %}
@@ -256,15 +249,15 @@
                   {% endfor %}
                 </select>
               </div>
-              <textarea name="idea" rows="4" required placeholder="{{ ui_text('鎻忚堪鏁呬簨銆侀鏍笺€佽鑹层€佺害鏉燂紝鎴栬€呯洿鎺ヨ緭鍏ワ細寮€濮嬪啓銆?, 'Describe the story, tone, cast, constraints, or simply type: start writing.') }}"></textarea>
+              <textarea name="idea" rows="4" required placeholder="{{ ui_text('描述故事、风格、角色、约束，或者直接输入：开始创作。', 'Describe the story, tone, cast, constraints, or simply type: start writing.') }}"></textarea>
               <div class="chat-input-actions">
-                <button type="submit" class="primary-btn">{{ ui_text('鍒涘缓浼氳瘽', 'Create conversation') }}</button>
+                <button type="submit" class="primary-btn">{{ ui_text('开始创作', 'Start creating') }}</button>
                 {% if active_session %}
-                <a href="{{ app_path('/console/chat') }}?session_id={{ active_session.id }}" class="ghost-btn">{{ ui_text('杩斿洖褰撳墠浼氳瘽', 'Back to current') }}</a>
+                <a href="{{ app_path('/console/chat') }}?session_id={{ active_session.id }}" class="ghost-btn">{{ ui_text('返回当前会话', 'Back to current') }}</a>
                 {% endif %}
               </div>
               {% else %}
-              <div class="empty-note">{{ ui_text('璇峰厛鍦?Models 椤甸潰閰嶇疆 provider 鍜?API key銆?, 'Configure a provider and API key on the Models page first.') }}</div>
+              <div class="empty-note">{{ ui_text('请先在 Models 页面配置 provider 和 API key。', 'Configure a provider and API key on the Models page first.') }}</div>
               {% endif %}
             </form>
             {% endif %}
@@ -275,134 +268,12 @@
   </div>
 </section>
 
-{% if chat_session and not compose_new %}
-{% if not chat_session.final_job_id %}
 <script src="{{ static_asset_path('idea_copilot_live.js') }}?v=20260327f"></script>
-{% endif %}
-{% if chat_session.final_job_id %}
 <script src="{{ static_asset_path('chat_run_live.js') }}?v=20260327d"></script>
-{% endif %}
+{% if chat_session %}
 <script>
   (function () {
     var started = false;
-
-    function readPayload(response) {
-      var contentType = response.headers.get('content-type') || '';
-      if (contentType.indexOf('application/json') !== -1) {
-        return response.json();
-      }
-      return response.text().then(function (raw) {
-        return { ok: response.ok, error: raw || response.statusText || 'Request failed' };
-      });
-    }
-
-    function installFallbackIdeaLive(root) {
-      if (!root || root.dataset.ideaFallbackBound === '1') return false;
-      var form = root.querySelector('[data-idea-reply-form]');
-      var feed = root.querySelector('[data-idea-feed]');
-      var statusNode = root.querySelector('[data-idea-status]');
-      var textarea = form ? form.querySelector('textarea[name=reply]') : null;
-      var submitBtn = form ? form.querySelector('button[type=submit]') : null;
-      if (!form || !feed || !textarea || !submitBtn) return false;
-      root.dataset.ideaFallbackBound = '1';
-
-      function setStatus(kind, message) {
-        if (!statusNode) return;
-        if (!message) {
-          statusNode.hidden = true;
-          statusNode.textContent = '';
-          statusNode.className = 'console-alert';
-          return;
-        }
-        statusNode.hidden = false;
-        statusNode.className = 'console-alert ' + (kind === 'error' ? 'error' : 'ok');
-        statusNode.textContent = message;
-      }
-
-      function setBusy(isBusy) {
-        textarea.disabled = isBusy;
-        submitBtn.disabled = isBusy;
-      }
-
-      function appendPending() {
-        if (feed.querySelector('[data-pending-row="1"]')) return;
-        feed.insertAdjacentHTML('beforeend', '<div class="chat-row assistant is-pending" data-pending-row="1"><div class="avatar-circle">WC</div><div class="assistant-panel"><div class="assistant-section"><div class="assistant-title">' + (root.dataset.labelAnalysisTitle || 'NovelClaw analysis') + '</div><div class="assistant-text typing-dots">' + (root.dataset.labelThinking || 'Thinking') + '</div></div></div></div>');
-        feed.scrollTop = feed.scrollHeight;
-      }
-
-      function latestVisibleMessageIsUser() {
-        var last = feed ? feed.lastElementChild : null;
-        if (!last || !last.classList) return false;
-        return last.classList.contains('user') || last.classList.contains('chat-user');
-      }
-
-      function pollState() {
-        var sessionId = root.dataset.sessionId || '';
-        if (!sessionId) return;
-        var timer = window.setInterval(function () {
-          fetch(window.__appPath('/api/idea-copilot/' + sessionId + '/state?_=' + Date.now()), { headers: { Accept: 'application/json' }, cache: 'no-store' })
-            .then(readPayload)
-            .then(function (data) {
-              if (!data || !data.ok) return;
-              if (data.final_job_id) {
-                window.clearInterval(timer);
-                window.location.href = window.__appPath('/console/chat?session_id=' + encodeURIComponent(sessionId));
-                return;
-              }
-              var messages = Array.isArray(data.messages) ? data.messages : [];
-              var latest = messages.length ? String(messages[messages.length - 1].role || '') : '';
-              if (data.reply_pending || latest === 'user') {
-                appendPending();
-                setStatus('ok', root.dataset.labelContinuing || 'NovelClaw is continuing...');
-                return;
-              }
-              window.clearInterval(timer);
-              window.location.href = window.__appPath('/console/chat?session_id=' + encodeURIComponent(sessionId));
-            })
-            .catch(function () {});
-        }, 900);
-      }
-
-      form.addEventListener('submit', function (event) {
-        event.preventDefault();
-        var reply = String(textarea.value || '').trim();
-        if (!reply) {
-          setStatus('error', 'Reply cannot be empty');
-          return;
-        }
-        var payload = new FormData(form);
-        setBusy(true);
-        setStatus('ok', '');
-        feed.insertAdjacentHTML('beforeend', '<div class="chat-row user"><div class="user-bubble"></div><div class="user-tag">' + (root.dataset.labelYou || 'You') + '</div></div>');
-        var bubble = feed.lastElementChild && feed.lastElementChild.querySelector('.user-bubble');
-        if (bubble) bubble.textContent = reply;
-        textarea.value = '';
-        appendPending();
-        fetch(form.action, {
-          method: 'POST',
-          body: payload,
-          headers: { 'X-Requested-With': 'fetch', Accept: 'application/json' }
-        })
-          .then(readPayload)
-          .then(function (data) {
-            if (!data || !data.ok) throw new Error((data && (data.error || data.detail)) || 'Submit failed');
-            setStatus('ok', root.dataset.labelContinuing || 'NovelClaw is continuing...');
-            pollState();
-          })
-          .catch(function (error) {
-            setBusy(false);
-            setStatus('error', error && error.message ? error.message : 'Request failed');
-          });
-      });
-
-      if (root.dataset.replyPending === 'true' || latestVisibleMessageIsUser()) {
-        setBusy(true);
-        appendPending();
-        setStatus('ok', root.dataset.labelContinuing || 'NovelClaw is continuing...');
-        pollState();
-      }
-      return true;
-    }
 
     function start() {
       if (started) return true;
@@ -410,10 +281,6 @@
       var root = document.querySelector('[data-idea-copilot-root][data-layout="dashboard"]');
       if (root && typeof window.initIdeaCopilotLive === 'function') {
         window.initIdeaCopilotLive(root);
-        started = true;
-        return true;
-      }
-      if (root && installFallbackIdeaLive(root)) {
         started = true;
         return true;
       }
@@ -442,42 +309,4 @@
   })();
 </script>
 {% endif %}
-
-<script>
-function toggleBriefEdit(btn) {
-  var form = document.getElementById('brief-edit-form');
-  if (!form) return;
-  var isOpen = form.classList.contains('is-open');
-  form.classList.toggle('is-open', !isOpen);
-  if (!isOpen) {
-    var ta = document.getElementById('brief-edit-text');
-    var current = document.querySelector('[data-refined-idea]');
-    if (ta && current) ta.value = current.textContent.trim();
-    if (ta) ta.focus();
-  }
-}
-async function saveBrief(sessionId) {
-  var ta = document.getElementById('brief-edit-text');
-  var status = document.getElementById('brief-edit-status');
-  if (!ta) return;
-  var val = ta.value.trim();
-  if (!val) { if (status) { status.textContent = '{{ ui_text("鍐呭涓嶈兘涓虹┖", "Content cannot be empty") }}'; status.className = 'inline-status err'; } return; }
-  if (status) { status.textContent = '{{ ui_text("淇濆瓨涓?..", "Saving...") }}'; status.className = 'inline-status'; }
-  try {
-    var resp = await fetch('{{ app_path('/api/idea-copilot') }}/' + sessionId + '/brief', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-      body: JSON.stringify({ brief: val })
-    });
-    var data = await resp.json();
-    if (!resp.ok || !data.ok) throw new Error(data.detail || data.error || 'Save failed');
-    document.querySelectorAll('[data-refined-idea]').forEach(function(el) { el.textContent = data.refined_idea; });
-    if (status) { status.textContent = '{{ ui_text("宸蹭繚瀛?, "Saved") }}'; status.className = 'inline-status ok'; }
-    setTimeout(function() { var f = document.getElementById('brief-edit-form'); if (f) f.classList.remove('is-open'); }, 900);
-  } catch (e) {
-    if (status) { status.textContent = e.message || 'Error'; status.className = 'inline-status err'; }
-  }
-}
-</script>
 {% endblock %}
-
