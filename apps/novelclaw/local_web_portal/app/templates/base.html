@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="{{ ui_language or 'en' }}">
 <head>
   <meta charset="UTF-8">
@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="{{ static_asset_path('style.css') }}?v=20260327g">
+  <link rel="stylesheet" href="{{ static_asset_path('style.css') }}?v=20260330a">
   <meta name="app-base-path" content="{{ app_base_path }}">
   <script>
     window.__APP_BASE_PATH__ = {{ app_base_path|tojson }};
@@ -25,107 +25,141 @@
 <body class="{% if user %}console-body{% else %}auth-body{% endif %}">
   {% set page_content %}{% block content %}{% endblock %}{% endset %}
   {% if user %}
+  {% set session_suffix = '?session_id=' ~ active_session.id if active_session else '' %}
+  {% set current_path = current_path if current_path is defined and current_path else current_public_path(request) %}
   <div class="console-shell">
     <aside class="console-sidebar">
-      {% set session_suffix = '?session_id=' ~ active_session.id if active_session else '' %}
-      {% set system_nav_active = active_nav in ['skills', 'mcp', 'agents', 'sessions', 'status', 'models', 'env'] %}
       <div>
         <div class="console-sidebar-head">
           <a href="{{ app_path('/console/chat') }}{{ session_suffix }}" class="console-brand">
             <div class="console-brand-logo">WC</div>
             <div>
               <div class="console-brand-title">NovelClaw</div>
-              <div class="console-brand-subtitle">{{ ui_texts.brand_subtitle }}</div>
+              <div class="console-brand-subtitle">{{ ui_text('长篇写作工作台', 'Long-form Writing Workspace') }}</div>
             </div>
           </a>
-          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Toggle sidebar" aria-pressed="false">鈮?/button>
+          <button type="button" class="sidebar-toggle" data-sidebar-toggle aria-label="Toggle sidebar" aria-pressed="false">≡</button>
         </div>
 
         <div class="console-nav-group">
-          <div class="console-nav-label">{{ ui_text("瀵硅瘽", "Conversation") }}</div>
-          <a href="{{ app_path('/console/chat') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'chat' %}is-active{% endif %}" title="{{ ui_texts.nav_chat }}"><span class="console-nav-icon">01</span><span data-user-label-key="nav.chat">{{ ui_texts.nav_chat }}</span></a>
+          <div class="console-nav-label">{{ ui_text('对话', 'Conversation') }}</div>
+          <a href="{{ app_path('/console/chat') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'chat' %}is-active{% endif %}">
+            <span class="console-nav-icon">01</span>
+            <span>{{ ui_text('对话工作台', 'Chat Workspace') }}</span>
+          </a>
         </div>
 
         <div class="console-nav-group">
-          <div class="console-nav-label">{{ ui_text("鍒涗綔鍙?, "Studio") }}</div>
-          <a href="{{ app_path('/console/manuscript/read') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'manuscript_read' %}is-active{% endif %}" title="{{ ui_text("闃呰", "Read") }}"><span class="console-nav-icon">02</span><span>{{ ui_text("闃呰", "Read") }}</span></a>
-          <a href="{{ app_path('/console/manuscript/outline') }}{{ session_suffix }}" class="console-nav-item console-nav-item-sub {% if active_nav == 'manuscript_outline' %}is-active{% endif %}" title="{{ ui_text("澶х翰", "Outline") }}"><span class="console-nav-icon">03</span><span>{{ ui_text("澶х翰", "Outline") }}</span></a>
-          <a href="{{ app_path('/console/manuscript/planning') }}{{ session_suffix }}" class="console-nav-item console-nav-item-sub {% if active_nav == 'manuscript_planning' %}is-active{% endif %}" title="{{ ui_text("瑙勫垝", "Planning") }}"><span class="console-nav-icon">04</span><span>{{ ui_text("瑙勫垝", "Planning") }}</span></a>
-          <a href="{{ app_path('/console/storyboard') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'storyboard' %}is-active{% endif %}" title="{{ ui_texts.nav_storyboard }}"><span class="console-nav-icon">05</span><span>{{ ui_texts.nav_storyboard }}</span></a>
+          <div class="console-nav-label">{{ ui_text('写作', 'Writing') }}</div>
+          <a href="{{ app_path('/console/manuscript/read') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'manuscript_read' %}is-active{% endif %}">
+            <span class="console-nav-icon">02</span>
+            <span>{{ ui_text('阅读稿件', 'Read Draft') }}</span>
+          </a>
+          <a href="{{ app_path('/console/manuscript/outline') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'manuscript_outline' %}is-active{% endif %}">
+            <span class="console-nav-icon">03</span>
+            <span>{{ ui_text('大纲', 'Outline') }}</span>
+          </a>
+          <a href="{{ app_path('/console/manuscript/planning') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'manuscript_planning' %}is-active{% endif %}">
+            <span class="console-nav-icon">04</span>
+            <span>{{ ui_text('规划', 'Planning') }}</span>
+          </a>
+          <a href="{{ app_path('/console/storyboard') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'storyboard' %}is-active{% endif %}">
+            <span class="console-nav-icon">05</span>
+            <span>{{ ui_text('故事板', 'Storyboard') }}</span>
+          </a>
         </div>
 
         <div class="console-nav-group">
-          <div class="console-nav-label">{{ ui_text("璁板繂", "Memory") }}</div>
-          <a href="{{ app_path('/console/memory/zone/premise') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'memory_zone_premise' %}is-active{% endif %}" title="{{ ui_text("鏁呬簨鍓嶆彁", "Story Premise") }}"><span class="console-nav-icon">06</span><span>{{ ui_text("鏁呬簨鍓嶆彁", "Story Premise") }}</span></a>
-          <a href="{{ app_path('/console/memory/zone/author_brief') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'memory_zone_author_brief' %}is-active{% endif %}" title="{{ ui_text("浣滆€呰姹?, "Author Brief") }}"><span class="console-nav-icon">07</span><span>{{ ui_text("浣滆€呰姹?, "Author Brief") }}</span></a>
-          <a href="{{ app_path('/console/memory/zone/chapter_planning') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'memory_zone_chapter_planning' %}is-active{% endif %}" title="{{ ui_text("绔犺妭瑙勫垝", "Chapter Planning") }}"><span class="console-nav-icon">08</span><span>{{ ui_text("绔犺妭瑙勫垝", "Chapter Planning") }}</span></a>
-          <a href="{{ app_path('/console/memory/zone/revision_loop') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'memory_zone_revision_loop' %}is-active{% endif %}" title="{{ ui_text("淇寰幆", "Revision Loop") }}"><span class="console-nav-icon">09</span><span>{{ ui_text("淇寰幆", "Revision Loop") }}</span></a>
-          <a href="{{ app_path('/console/memory/zone/canon_state') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'memory_zone_canon_state' %}is-active{% endif %}" title="{{ ui_text("璁惧畾杩炵画鎬?, "Canon State") }}"><span class="console-nav-icon">10</span><span>{{ ui_text("璁惧畾杩炵画鎬?, "Canon State") }}</span></a>
-          <a href="{{ app_path('/console/memory/zone/runtime') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'memory_zone_runtime' %}is-active{% endif %}" title="{{ ui_text("杩愯鐜板満", "Runtime") }}"><span class="console-nav-icon">11</span><span>{{ ui_text("杩愯鐜板満", "Runtime") }}</span></a>
+          <div class="console-nav-label">{{ ui_text('记忆', 'Memory') }}</div>
+          <a href="{{ app_path('/console/memory/banks') }}{{ session_suffix }}" class="console-nav-item {% if active_nav in ['memory', 'memory_banks'] %}is-active{% endif %}">
+            <span class="console-nav-icon">06</span>
+            <span>{{ ui_text('记忆库', 'Memory Banks') }}</span>
+          </a>
+          <a href="{{ app_path('/console/style') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'style' %}is-active{% endif %}">
+            <span class="console-nav-icon">07</span>
+            <span>{{ ui_text('风格', 'Style') }}</span>
+          </a>
+          <a href="{{ app_path('/console/characters') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'characters' %}is-active{% endif %}">
+            <span class="console-nav-icon">08</span>
+            <span>{{ ui_text('角色', 'Characters') }}</span>
+          </a>
+          <a href="{{ app_path('/console/world') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'world' %}is-active{% endif %}">
+            <span class="console-nav-icon">09</span>
+            <span>{{ ui_text('世界观', 'World') }}</span>
+          </a>
         </div>
 
         <div class="console-nav-group">
-          <div class="console-nav-label">{{ ui_text("鍒涗綔杈呭姪", "Craft tools") }}</div>
-          <a href="{{ app_path('/console/style') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'style' %}is-active{% endif %}" title="{{ ui_texts.nav_style }}"><span class="console-nav-icon">12</span><span>{{ ui_texts.nav_style }}</span></a>
-          <a href="{{ app_path('/console/characters') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'characters' %}is-active{% endif %}" title="{{ ui_texts.nav_characters }}"><span class="console-nav-icon">13</span><span>{{ ui_texts.nav_characters }}</span></a>
-          <a href="{{ app_path('/console/world') }}{{ session_suffix }}" class="console-nav-item {% if active_nav == 'world' %}is-active{% endif %}" title="{{ ui_texts.nav_world }}"><span class="console-nav-icon">14</span><span>{{ ui_texts.nav_world }}</span></a>
+          <div class="console-nav-label">{{ ui_text('运行', 'Runs') }}</div>
+          <a href="{{ app_path('/console/tasks') }}" class="console-nav-item {% if active_nav == 'tasks' %}is-active{% endif %}">
+            <span class="console-nav-icon">10</span>
+            <span>{{ ui_text('运行任务', 'Runs') }}</span>
+          </a>
+          <a href="{{ app_path('/console/sessions') }}" class="console-nav-item {% if active_nav == 'sessions' %}is-active{% endif %}">
+            <span class="console-nav-icon">11</span>
+            <span>{{ ui_text('会话', 'Sessions') }}</span>
+          </a>
+          <a href="{{ app_path('/console/status') }}" class="console-nav-item {% if active_nav == 'status' %}is-active{% endif %}">
+            <span class="console-nav-icon">12</span>
+            <span>{{ ui_text('状态', 'Status') }}</span>
+          </a>
         </div>
 
         <div class="console-nav-group">
-          <div class="console-nav-label">{{ ui_text("褰撳墠鐘舵€?, "Current status") }}</div>
-          <div class="console-focus-card">
-            <div class="console-focus-label">{{ ui_text("娲诲姩浼氳瘽", "Active session") }}</div>
-            <strong>{{ status_summary.session_label }}</strong>
-            <div class="console-focus-meta">{{ status_summary.session_status }} | {{ status_summary.agent_mode }}</div>
-            <div class="console-focus-grid">
-              <div>
-                <span>{{ ui_text("璁板繂", "Memory") }}</span>
-                <strong>{{ status_summary.memory_count }}</strong>
-              </div>
-              <div>
-                <span>{{ ui_text("绔犺妭", "Chapters") }}</span>
-                <strong>{{ status_summary.chapter_outputs }}</strong>
-              </div>
-            </div>
-          </div>
+          <div class="console-nav-label">{{ ui_text('系统', 'System') }}</div>
+          <a href="{{ app_path('/console/models') }}" class="console-nav-item {% if active_nav == 'models' %}is-active{% endif %}">
+            <span class="console-nav-icon">13</span>
+            <span>{{ ui_text('模型', 'Models') }}</span>
+          </a>
+          <a href="{{ app_path('/console/agents') }}" class="console-nav-item {% if active_nav == 'agents' %}is-active{% endif %}">
+            <span class="console-nav-icon">14</span>
+            <span>{{ ui_text('Agents', 'Agents') }}</span>
+          </a>
+          <a href="{{ app_path('/console/skills') }}" class="console-nav-item {% if active_nav == 'skills' %}is-active{% endif %}">
+            <span class="console-nav-icon">15</span>
+            <span>{{ ui_text('Skills', 'Skills') }}</span>
+          </a>
+          <a href="{{ app_path('/console/env') }}" class="console-nav-item {% if active_nav == 'env' %}is-active{% endif %}">
+            <span class="console-nav-icon">16</span>
+            <span>{{ ui_text('环境', 'Environment') }}</span>
+          </a>
         </div>
-
-        <details class="console-nav-drawer" {% if system_nav_active %}open{% endif %}>
-          <summary class="console-nav-drawer-summary">
-            <span>{{ ui_text("绯荤粺鎺у埗", "System") }}</span>
-            <span class="console-nav-drawer-icon">+</span>
-          </summary>
-          <div class="console-nav-drawer-body">
-            <div class="console-nav-group">
-              <div class="console-nav-label">{{ ui_text("绯荤粺涓庤兘鍔?, "System and capability") }}</div>
-              <a href="{{ app_path('/console/sessions') }}" class="console-nav-item {% if active_nav == 'sessions' %}is-active{% endif %}" title="{{ ui_texts.nav_sessions }}"><span class="console-nav-icon">12</span><span>{{ ui_texts.nav_sessions }}</span></a>
-              <a href="{{ app_path('/console/status') }}" class="console-nav-item {% if active_nav == 'status' %}is-active{% endif %}" title="{{ ui_texts.nav_status }}"><span class="console-nav-icon">13</span><span>{{ ui_texts.nav_status }}</span></a>
-              <a href="{{ app_path('/console/models') }}" class="console-nav-item {% if active_nav == 'models' %}is-active{% endif %}" title="{{ ui_texts.nav_models }}"><span class="console-nav-icon">14</span><span>{{ ui_texts.nav_models }}</span></a>
-              <a href="{{ app_path('/console/skills') }}" class="console-nav-item {% if active_nav == 'skills' %}is-active{% endif %}" title="{{ ui_texts.nav_skills }}"><span class="console-nav-icon">15</span><span>{{ ui_texts.nav_skills }}</span></a>
-              <a href="{{ app_path('/console/mcp') }}" class="console-nav-item {% if active_nav == 'mcp' %}is-active{% endif %}" title="{{ ui_texts.nav_mcp }}"><span class="console-nav-icon">16</span><span>{{ ui_texts.nav_mcp }}</span></a>
-              <a href="{{ app_path('/console/agents') }}" class="console-nav-item {% if active_nav == 'agents' %}is-active{% endif %}" title="{{ ui_texts.nav_agents }}"><span class="console-nav-icon">17</span><span>{{ ui_texts.nav_agents }}</span></a>
-              <a href="{{ app_path('/console/env') }}" class="console-nav-item {% if active_nav == 'env' %}is-active{% endif %}" title="{{ ui_texts.nav_environment }}"><span class="console-nav-icon">18</span><span>{{ ui_texts.nav_environment }}</span></a>
-            </div>
-          </div>
-        </details>
       </div>
 
       <div class="console-sidebar-footer">
         <div class="console-runtime-card">
           <span class="console-runtime-dot"></span>
-          <span>{{ ui_texts.runtime_running }}</span>
+          <span>{{ ui_text('NovelClaw 运行中', 'NovelClaw running') }}</span>
         </div>
-        <div class="console-runtime-meta">{{ ui_texts.runtime_mode }}={{ status_summary.agent_mode if status_summary else 'claw' }} | {{ ui_texts.runtime_max_steps }}={{ status_summary.claw_max_steps if status_summary else '-' }}</div>
+        <div class="console-runtime-meta">
+          {{ ui_text('模式', 'mode') }}={{ status_summary.agent_mode if status_summary else 'claw' }}
+          |
+          {{ ui_text('最大步数', 'max_steps') }}={{ status_summary.claw_max_steps if status_summary else '-' }}
+        </div>
+
         <div class="console-lang-switch">
           <form method="post" action="{{ app_path('/ui-language') }}">
             <input type="hidden" name="lang" value="zh">
-            <input type="hidden" name="next" value="{{ current_path if current_path else current_public_path(request) }}">
-            <button class="lang-btn {% if ui_language == 'zh' %}is-active{% endif %}" type="submit">{{ ui_texts.lang_zh }}</button>
+            <input type="hidden" name="next" value="{{ current_path }}">
+            <button class="lang-btn {% if ui_language == 'zh' %}is-active{% endif %}" type="submit">{{ ui_text('中文', 'ZH') }}</button>
           </form>
           <form method="post" action="{{ app_path('/ui-language') }}">
             <input type="hidden" name="lang" value="en">
-            <input type="hidden" name="next" value="{{ current_path if current_path else current_public_path(request) }}">
-            <button class="lang-btn {% if ui_language == 'en' %}is-active{% endif %}" type="submit">{{ ui_texts.lang_en }}</button>
+            <input type="hidden" name="next" value="{{ current_path }}">
+            <button class="lang-btn {% if ui_language == 'en' %}is-active{% endif %}" type="submit">{{ ui_text('English', 'EN') }}</button>
+          </form>
+        </div>
+
+        <div class="console-account-card">
+          <span class="console-block-label">{{ ui_text('当前账号', 'Account') }}</span>
+          <strong>{{ user.email }}</strong>
+          <small>{{ ui_text('NovelClaw 工作区', 'NovelClaw workspace') }}</small>
+        </div>
+
+        <div class="console-sidebar-actions">
+          <a href="{{ shared_path('/select-mode') }}" class="btn btn-outline btn-block">{{ ui_text('切换模式', 'Switch mode') }}</a>
+          <form method="post" action="{{ shared_path('/logout') }}">
+            <button type="submit" class="btn btn-ghost btn-block">{{ ui_text('退出登录', 'Log out') }}</button>
           </form>
         </div>
       </div>
@@ -140,6 +174,7 @@
   {% else %}
     {{ page_content }}
   {% endif %}
+
   {% if user %}
   <script>
     (function () {
@@ -159,66 +194,6 @@
       });
     })();
   </script>
-  <script>
-    (function () {
-      const roots = Array.from(document.querySelectorAll(".console-sidebar .console-nav-label, .console-sidebar .console-nav-item span:last-child, .console-sidebar .console-nav-drawer-summary > span:first-child"));
-      if (!roots.length) return;
-      const storageKey = "novelclaw.custom_sidebar_labels";
-      const isZh = String(document.documentElement.lang || "").toLowerCase().startsWith("zh");
-      let saved = {};
-      try {
-        saved = JSON.parse(window.localStorage.getItem(storageKey) || "{}") || {};
-      } catch (_) {
-        saved = {};
-      }
-
-      function labelKey(node, index) {
-        if (node.dataset.userLabelKey) return node.dataset.userLabelKey;
-        const link = node.closest(".console-nav-item");
-        if (link && link.getAttribute("href")) return `href:${link.getAttribute("href")}`;
-        return `text:${index}`;
-      }
-
-      function helpText(name) {
-        return isZh ? `淇敼鏍囩锛?{name}\n鐣欑┖鎭㈠榛樿` : `Rename label: ${name}\nLeave empty to reset`;
-      }
-
-      function applyLabels() {
-        roots.forEach((node, index) => {
-          const key = labelKey(node, index);
-          const fallback = node.dataset.userLabelDefault || node.textContent.trim();
-          if (!node.dataset.userLabelDefault) node.dataset.userLabelDefault = fallback;
-          const custom = typeof saved[key] === "string" ? saved[key].trim() : "";
-          node.textContent = custom || fallback;
-          node.title = isZh ? "鍙屽嚮鍗冲彲鏀瑰悕锛岀暀绌烘仮澶嶉粯璁? : "Double-click to rename. Leave empty to reset.";
-        });
-      }
-
-      function rename(node, index) {
-        const key = labelKey(node, index);
-        const fallback = node.dataset.userLabelDefault || node.textContent.trim();
-        const current = (typeof saved[key] === "string" ? saved[key].trim() : "") || fallback;
-        const next = window.prompt(helpText(fallback), current);
-        if (next === null) return;
-        const cleaned = String(next).trim();
-        if (cleaned) saved[key] = cleaned;
-        else delete saved[key];
-        window.localStorage.setItem(storageKey, JSON.stringify(saved));
-        applyLabels();
-      }
-
-      roots.forEach((node, index) => {
-        node.addEventListener("dblclick", function (event) {
-          event.preventDefault();
-          event.stopPropagation();
-          rename(node, index);
-        });
-      });
-
-      applyLabels();
-    })();
-  </script>
   {% endif %}
 </body>
 </html>
-
