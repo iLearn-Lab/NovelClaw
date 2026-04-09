@@ -25,6 +25,12 @@
   </p>
 
   <p>
+    <a href="https://github.com/iLearn-Lab">Yucheng Xiao</a><sup>1</sup>
+    <br>
+    <sup>1</sup>Harbin Institute of Technology, Shenzhen
+  </p>
+
+  <p>
     <a href="https://colong-idea-studio.cloud/"><img src="https://img.shields.io/badge/Live%20Platform-Open%20Now-0f766e?style=flat-square&logo=googlechrome&logoColor=white" alt="Live platform"></a>
     <a href="README.zh-CN.md"><img src="https://img.shields.io/badge/Chinese-README-ef4444?style=flat-square" alt="Chinese README"></a>
     <a href="RUN_LOCAL_WEB.md"><img src="https://img.shields.io/badge/Local%20Run-Startup%20Guide-f59e0b?style=flat-square&logo=readthedocs&logoColor=white" alt="Local run guide"></a>
