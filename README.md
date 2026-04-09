@@ -52,7 +52,7 @@
 
 ## Overview 🌟
 
-docs/novelclaw-demo.mp4
+https://github.com/user-attachments/assets/f768395f-0d6e-471f-826d-62aed266fd0e
 
 <p align="center">
   <sub>Demo showcase of the NovelClaw workspace.</sub>
