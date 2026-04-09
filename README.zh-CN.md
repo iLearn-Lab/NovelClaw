@@ -45,7 +45,13 @@
 </div>
 
 <p align="center">
-  <img src="docs/hero.png" alt="NovelClaw 主视觉图" width="100%">
+  <video src="docs/novelclaw-demo.mp4" controls muted playsinline preload="metadata" poster="docs/hero.png" width="100%">
+    当前环境不支持内嵌视频。<a href="docs/novelclaw-demo.mp4">点此下载 NovelClaw 演示视频</a>。
+  </video>
+</p>
+
+<p align="center">
+  <sub>NovelClaw 工作区演示视频预览。</sub>
 </p>
 
 > 🚀 **本地预览**

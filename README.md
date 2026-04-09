@@ -45,7 +45,13 @@
 </div>
 
 <p align="center">
-  <img src="docs/hero.png" alt="NovelClaw hero image" width="100%">
+  <video src="docs/novelclaw-demo.mp4" controls muted playsinline preload="metadata" poster="docs/hero.png" width="100%">
+    Your browser does not support embedded video. <a href="docs/novelclaw-demo.mp4">Download the NovelClaw demo video</a>.
+  </video>
+</p>
+
+<p align="center">
+  <sub>Demo video preview of the NovelClaw workspace.</sub>
 </p>
 
 > 🚀 **Local Preview**
