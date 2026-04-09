@@ -44,16 +44,6 @@
   </p>
 </div>
 
-<p align="center">
-  <video src="docs/novelclaw-demo.mp4" controls muted playsinline preload="metadata" poster="docs/hero.png" width="100%">
-    Your browser does not support embedded video. <a href="docs/novelclaw-demo.mp4">Download the NovelClaw demo video</a>.
-  </video>
-</p>
-
-<p align="center">
-  <sub>Demo video preview of the NovelClaw workspace.</sub>
-</p>
-
 > 🚀 **Local Preview**
 > 👀 Enter from **`http://127.0.0.1:8010/select-mode`**, then continue into **`http://127.0.0.1:8012/dashboard`** for the main NovelClaw workspace.
 
@@ -61,6 +51,16 @@
 > Visit **[colong-idea-studio.cloud](https://colong-idea-studio.cloud/)** if you want the fastest online entry point.
 
 ## Overview 🌟
+
+<p align="center">
+  <a href="docs/novelclaw-demo.mp4">
+    <img src="docs/hero.png" alt="Watch the NovelClaw demo video" width="100%">
+  </a>
+</p>
+
+<p align="center">
+  <sub>Click the preview image to open the NovelClaw demo video (.mp4).</sub>
+</p>
 
 `NovelClaw` is the core writing workspace in this GitHub-safe public bundle. While `Portal` provides a clean public entry path and `MultiAgent` offers an optional faster ideation lane, the sustained long-form writing experience is concentrated in NovelClaw itself.
 
