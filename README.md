@@ -13,6 +13,12 @@
   <h3>✨ A structured long-form fiction workspace centered on chapter drafting, inspectable runs, manuscript review, and memory-aware writing control.</h3>
 
   <p>
+    <a href="https://github.com/xiao-zi-chen">Yucheng Xiao</a><sup>1</sup>
+    <br>
+    <sup>1</sup>Harbin Institute of Technology, Shenzhen
+  </p>
+
+  <p>
     💡 NovelClaw is not a one-shot prompt wrapper. It turns long-form fiction work into an inspectable writing workspace with sessions, storyboards, manuscript surfaces, character and world views, and editable memory banks.
   </p>
 
@@ -22,12 +28,6 @@
 
   <p>
     <b>🚀 Start locally now:</b> <code>.\START_LOCAL.bat</code>
-  </p>
-
-  <p>
-    <a href="https://github.com/iLearn-Lab">Yucheng Xiao</a><sup>1</sup>
-    <br>
-    <sup>1</sup>Harbin Institute of Technology, Shenzhen
   </p>
 
   <p>
