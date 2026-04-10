@@ -13,9 +13,13 @@
   <h3>✨ A structured long-form fiction workspace centered on chapter drafting, inspectable runs, manuscript review, and memory-aware writing control.</h3>
 
   <p>
-    <a href="https://github.com/xiao-zi-chen">Yucheng Xiao</a><sup>1</sup>
+    <a href="https://github.com/xiao-zi-chen">Yucheng Xiao</a><sup>1</sup> ·
+    <a href="https://github.com/Hengji-cs">Hengji Zhou</a><sup>1</sup> ·
+    <a href="https://github.com/akaxlh">Lianghao Xia</a><sup>1,*</sup>
     <br>
     <sup>1</sup>Harbin Institute of Technology, Shenzhen
+    <br>
+    <sup>*</sup>Corresponding author
   </p>
 
   <p>
