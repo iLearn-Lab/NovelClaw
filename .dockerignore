@@ -1,0 +1,61 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info
+dist
+build
+.venv
+.venv-shared
+venv
+env
+ENV
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Local data and runtime
+apps/*/local_web_portal/data/
+apps/*/local_web_portal/runs/
+state_snapshots/
+*.db
+*.db-journal
+*.log
+
+# Environment files (will be mounted as volumes)
+.env
+*.env
+!*.env.example
+
+# Documentation
+*.md
+docs/
+
+# Scripts (not needed in container)
+scripts/*.ps1
+scripts/*.bat
+*.bat
+*.ps1
+
+# Infra configs (not needed in container)
+infra/nginx/
+infra/systemd/
+
+# ISTask.dll (Windows specific)
+ISTask.dll

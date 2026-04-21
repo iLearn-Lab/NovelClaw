@@ -159,7 +159,55 @@ NovelClaw is built around a simple claim: long-form writing quality improves whe
 ## Quick Start 🚀
 
 <details open>
-<summary><b>🌐 Option A: One-Click Local Stack</b></summary>
+<summary><b>🐳 Option A: Docker Deployment (Recommended)</b></summary>
+
+💻 Quick start with Docker:
+
+**Windows:**
+```batch
+.\docker-start.bat
+```
+
+**Linux/Mac:**
+```bash
+chmod +x docker-start.sh
+./docker-start.sh
+```
+
+**Or manually:**
+```bash
+# 1. Setup environment files
+cp .env.auth-portal.example apps/auth-portal/.env
+cp .env.multiagent.example apps/multiagent/.env
+cp .env.novelclaw.example apps/novelclaw/.env
+
+# 2. Edit .env files with your API keys
+
+# 3. Start services
+docker-compose up -d
+```
+
+🌐 Access URLs:
+
+```text
+Portal      http://localhost:8010/select-mode
+MultiAgent  http://localhost:8011/dashboard
+NovelClaw   http://localhost:8012/dashboard
+```
+
+✅ Docker benefits:
+
+- no Python environment setup required
+- consistent deployment across platforms
+- easy to start, stop, and manage services
+- data persistence through volumes
+
+📖 See [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) for detailed Docker deployment guide.
+
+</details>
+
+<details>
+<summary><b>🌐 Option B: One-Click Local Stack</b></summary>
 
 💻 Recommended on Windows:
 

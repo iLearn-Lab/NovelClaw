@@ -1,0 +1,55 @@
+version: '3.8'
+
+services:
+  auth-portal:
+    build: .
+    container_name: novelclaw-auth-portal
+    working_dir: /app/apps/auth-portal
+    command: python -m uvicorn local_web_portal.app.main:app --host 0.0.0.0 --port 8010
+    ports:
+      - "8010:8010"
+    volumes:
+      - ./apps/auth-portal/local_web_portal/data:/app/apps/auth-portal/local_web_portal/data
+      - ./apps/auth-portal/.env:/app/apps/auth-portal/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - novelclaw-network
+
+  multiagent:
+    build: .
+    container_name: novelclaw-multiagent
+    working_dir: /app/apps/multiagent
+    command: python -m uvicorn local_web_portal.app.main:app --host 0.0.0.0 --port 8011
+    ports:
+      - "8011:8011"
+    volumes:
+      - ./apps/multiagent/local_web_portal/data:/app/apps/multiagent/local_web_portal/data
+      - ./apps/multiagent/.env:/app/apps/multiagent/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - novelclaw-network
+
+  novelclaw:
+    build: .
+    container_name: novelclaw-workspace
+    working_dir: /app/apps/novelclaw
+    command: python -m uvicorn local_web_portal.app.main:app --host 0.0.0.0 --port 8012
+    ports:
+      - "8012:8012"
+    volumes:
+      - ./apps/novelclaw/local_web_portal/data:/app/apps/novelclaw/local_web_portal/data
+      - ./apps/novelclaw/local_web_portal/runs:/app/apps/novelclaw/local_web_portal/runs
+      - ./apps/novelclaw/.env:/app/apps/novelclaw/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    networks:
+      - novelclaw-network
+
+networks:
+  novelclaw-network:
+    driver: bridge
