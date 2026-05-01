@@ -12,7 +12,16 @@
 
   <h3>✨ A structured long-form fiction workspace centered on chapter drafting, inspectable runs, manuscript review, and memory-aware writing control.</h3>
 
-  
+  <p>
+    <a href=" ">Yucheng Xiao</a ><sup>1</sup>,
+    <a href="https://github.com/Hengji-cs">Hengji Zhou</a ><sup>1</sup>,
+    <a href="https://github.com/akaxlh">Lianghao Xia</a ><sup>1,*</sup>,
+    <a href="https://github.com/liqiangnie">Liqiang Nie</a ><sup>1,*</sup>
+    <br>
+    <sup>1</sup>Harbin Institute of Technology, Shenzhen
+    <br>
+    <sup>*</sup>Corresponding authors
+  </p >
 
   <p>
     💡 NovelClaw is not a one-shot prompt wrapper. It turns long-form fiction work into an inspectable writing workspace with sessions, storyboards, manuscript surfaces, character and world views, and editable memory banks.
