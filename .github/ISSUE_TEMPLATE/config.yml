@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 讨论与使用交流
+    url: https://github.com/iLearn-Lab/NovelClaw/discussions
+    about: 不属于明确问题反馈或功能建议的内容，请先在 Discussions 中交流。
