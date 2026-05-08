@@ -1,0 +1,59 @@
+name: 问题反馈
+description: 报告 NovelClaw 的可复现问题
+title: "[Bug]: "
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请只提交与 NovelClaw 使用或开发直接相关的问题。无关、重复、辱骂、刷屏或恶意内容会被关闭、锁定、删除并向 GitHub 举报。
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我确认这个 issue 与 NovelClaw 项目直接相关，不是刷屏、攻击、广告或无关讨论。
+          required: true
+        - label: 我已经搜索过现有 issues，没有找到相同问题。
+          required: true
+        - label: 我会提供可复现信息，并保持讨论聚焦在技术问题本身。
+          required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 清楚描述你遇到的问题，以及你原本期望发生什么。
+      placeholder: 请描述实际表现和预期表现。
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 提供能让维护者复现问题的步骤。
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 填写操作系统、Python/Node 版本、部署方式、浏览器或相关依赖版本。
+      placeholder: |
+        OS:
+        Python/Node:
+        NovelClaw version/commit:
+        Deployment:
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或截图
+      description: 如有错误日志、截图或命令输出，请贴在这里。敏感信息请先脱敏。
+      render: shell
+    validations:
+      required: false
