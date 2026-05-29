@@ -174,10 +174,10 @@ cp .env.auth-portal.example apps/auth-portal/.env
 cp .env.multiagent.example apps/multiagent/.env
 cp .env.novelclaw.example apps/novelclaw/.env
 
-# 2. 编辑 .env 文件，添加你的 API 密钥
+# 2. 检查 .env 文件。只有实际调用云端 provider 时才需要 API Key。
 
 # 3. 启动服务
-docker-compose up -d
+docker compose up -d
 ```
 
 🌐 访问地址：
@@ -188,6 +188,8 @@ MultiAgent  http://localhost:8011/dashboard
 NovelClaw   http://localhost:8012/dashboard
 ```
 
+入口会保留你打开时使用的 host（`localhost` 或 `127.0.0.1`），再跳转到工作台端口，避免 Docker 下跨端口 session 丢失。
+
 ✅ Docker 部署优势：
 
 - 无需配置 Python 环境
@@ -196,6 +198,7 @@ NovelClaw   http://localhost:8012/dashboard
 - 通过卷挂载实现数据持久化
 
 📖 详细的 Docker 部署指南请参考 [DOCKER_DEPLOYMENT.zh-CN.md](DOCKER_DEPLOYMENT.zh-CN.md)
+🤖 CLI/agent 自动化可使用 [docs/AGENT_API.md](docs/AGENT_API.md) 中的 token API。
 
 </details>
 

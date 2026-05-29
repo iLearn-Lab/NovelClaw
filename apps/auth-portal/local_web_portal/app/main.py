@@ -77,6 +77,23 @@ def _selected_mode_label(mode: str, lang: str) -> str:
     return labels.get(mode, "未选择" if lang != "en" else "Not selected")
 
 
+def _external_host(request: Request) -> str:
+    host = request.url.hostname or "localhost"
+    if host in {"0.0.0.0", "::"}:
+        host = "localhost"
+    if ":" in host and not host.startswith("["):
+        return f"[{host}]"
+    return host
+
+
+def _workspace_url(request: Request, configured_url: str, port: str, path: str) -> str:
+    configured = (configured_url or "").strip()
+    if configured:
+        return configured
+    safe_path = path if path.startswith("/") else f"/{path}"
+    return urlunsplit((request.url.scheme, f"{_external_host(request)}:{port}", safe_path, "", ""))
+
+
 def _ensure_preview_user(request: Request, db: Session) -> User:
     uid = request.session.get("uid")
     if uid:
@@ -115,6 +132,8 @@ def select_mode(request: Request, db: Session = Depends(get_db)):
     user = _ensure_preview_user(request, db)
     lang = _ui_language(request)
     current_mode = _selected_mode(request)
+    mode_a_url = _workspace_url(request, settings.app_multiagent_url, settings.app_multiagent_port, "/dashboard")
+    mode_b_url = _workspace_url(request, settings.app_claw_url, settings.app_claw_port, "/dashboard")
     return templates.TemplateResponse(
         "select_mode.html",
         _portal_context(
@@ -124,6 +143,8 @@ def select_mode(request: Request, db: Session = Depends(get_db)):
             current_mode_label=_selected_mode_label(current_mode, lang),
             mode_a_url="/mode-a",
             mode_b_url="/mode-b",
+            mode_a_display_url=mode_a_url,
+            mode_b_display_url=mode_b_url,
         ),
     )
 
@@ -132,14 +153,14 @@ def select_mode(request: Request, db: Session = Depends(get_db)):
 def choose_mode_a(request: Request, db: Session = Depends(get_db)):
     _ensure_preview_user(request, db)
     request.session[SELECTED_MODE_KEY] = "mode_a"
-    return _redirect(settings.app_multiagent_url or "/multiagent/dashboard")
+    return _redirect(_workspace_url(request, settings.app_multiagent_url, settings.app_multiagent_port, "/dashboard"))
 
 
 @app.get("/mode-b")
 def choose_mode_b(request: Request, db: Session = Depends(get_db)):
     _ensure_preview_user(request, db)
     request.session[SELECTED_MODE_KEY] = "mode_b"
-    return _redirect(settings.app_claw_url or "/claw/dashboard")
+    return _redirect(_workspace_url(request, settings.app_claw_url, settings.app_claw_port, "/dashboard"))
 
 
 @app.post("/ui-language")

@@ -9,6 +9,8 @@ from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
+load_dotenv(BASE_DIR / ".env", override=False)
+load_dotenv(BASE_DIR.parent / ".env", override=False)
 
 
 def _resolve_runs_dir() -> Path:
@@ -25,8 +27,6 @@ RUNS_DIR = _resolve_runs_dir()
 
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 RUNS_DIR.mkdir(parents=True, exist_ok=True)
-
-load_dotenv(BASE_DIR / ".env", override=False)
 
 
 def env_or_default(name: str, default: str) -> str:
@@ -88,7 +88,10 @@ class Settings:
     session_cookie_name: str = env_or_default("APP_SESSION_COOKIE_NAME", "session")
     session_cookie_domain: str = os.getenv("APP_SESSION_COOKIE_DOMAIN", "").strip()
     shared_portal_url: str = os.getenv("APP_SHARED_PORTAL_URL", "").strip().rstrip("/")
+    shared_portal_port: str = os.getenv("APP_SHARED_PORTAL_PORT", "8010").strip() or "8010"
     base_path: str = os.getenv("APP_BASE_PATH", "").strip().rstrip("/")
+    agent_api_key: str = os.getenv("APP_AGENT_API_KEY", "").strip()
+    agent_user_email: str = os.getenv("APP_AGENT_USER_EMAIL", "agent@novelclaw.local").strip().lower() or "agent@novelclaw.local"
     modelless_mode: bool = os.getenv("WEB_MODELLESS_MODE", "1") == "1"
     default_provider: str = os.getenv("WEB_DEFAULT_PROVIDER", "deepseek").lower()
     ui_language: str = os.getenv("WEB_UI_LANGUAGE", "en").lower()

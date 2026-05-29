@@ -69,7 +69,7 @@
           </div>
           <p class="auth-mode-choice-copy">{% if zh %}从一句清晰的 Idea 出发，快速进入结构完整、章节齐全的长篇小说生成流程。{% else %}Start from a strong idea prompt and move quickly into a structured long-form generation workflow.{% endif %}</p>
           <a href="{{ mode_a_url }}" class="auth-mode-choice-cta auth-mode-choice-cta-primary">{% if zh %}打开 MultiAgent{% else %}Open MultiAgent{% endif %}</a>
-          <p class="auth-footnote" style="margin-top:10px;">/multiagent/dashboard</p>
+          <p class="auth-footnote" style="margin-top:10px;">{{ mode_a_display_url }}</p>
         </article>
 
         <article class="auth-mode-choice {% if current_mode == 'mode_b' %}is-active{% endif %}">
@@ -82,7 +82,7 @@
           </div>
           <p class="auth-mode-choice-copy">{% if zh %}更适合章节推进、记忆整理、长线创作和持续性写作打磨。{% else %}Better for chapter progression, memory-aware drafting, and longer-term writing refinement.{% endif %}</p>
           <a href="{{ mode_b_url }}" class="auth-mode-choice-cta auth-mode-choice-cta-secondary">{% if zh %}打开 NovelClaw{% else %}Open NovelClaw{% endif %}</a>
-          <p class="auth-footnote" style="margin-top:10px;">/claw/dashboard</p>
+          <p class="auth-footnote" style="margin-top:10px;">{{ mode_b_display_url }}</p>
         </article>
       </div>
 

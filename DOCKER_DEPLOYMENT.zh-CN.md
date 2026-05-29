@@ -22,10 +22,10 @@
    cp .env.novelclaw.example apps/novelclaw/.env
    ```
 
-3. **编辑 .env 文件**，添加你的 API 密钥：
-   - `apps/novelclaw/.env` - 添加 OpenAI/Anthropic API 密钥
-   - `apps/multiagent/.env` - 添加 OpenAI/Anthropic API 密钥
-   - `apps/auth-portal/.env` - 修改 SECRET_KEY
+3. **检查 .env 文件**：
+   - 打开 `/select-mode` 和进入两个工作台不需要 API Key。
+   - 可以稍后在界面里添加 provider key，也可以在生成前编辑 `apps/novelclaw/.env` 和 `apps/multiagent/.env`。
+   - 生产部署时，请为三个服务设置同一个 `APP_SESSION_SECRET`。
 
 4. **构建并启动所有服务**：
    
@@ -42,7 +42,7 @@
    
    **或手动启动**：
    ```bash
-   docker-compose up -d
+   docker compose up -d
    ```
 
 5. **访问应用**：
@@ -50,37 +50,41 @@
    - 多智能体：http://localhost:8011/dashboard
    - NovelClaw：http://localhost:8012/dashboard
 
+入口会保留你当前使用的浏览器 host。用 `http://127.0.0.1:8010/select-mode` 打开时，工作台链接也会继续使用 `127.0.0.1`；用 `localhost` 打开时则继续使用 `localhost`。
+
+CLI agent 可在 `apps/novelclaw/.env` 设置 `APP_AGENT_API_KEY`，再使用 [docs/AGENT_API.md](docs/AGENT_API.md) 中的 token API。
+
 ### Docker 常用命令
 
 **启动服务**：
 ```bash
-docker-compose up -d
+docker compose up -d
 ```
 
 **停止服务**：
 ```bash
-docker-compose down
+docker compose down
 ```
 
 **查看日志**：
 ```bash
 # 查看所有服务日志
-docker-compose logs -f
+docker compose logs -f
 
 # 查看特定服务日志
-docker-compose logs -f novelclaw
-docker-compose logs -f multiagent
-docker-compose logs -f auth-portal
+docker compose logs -f novelclaw
+docker compose logs -f multiagent
+docker compose logs -f auth-portal
 ```
 
 **代码更改后重新构建**：
 ```bash
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 **重启特定服务**：
 ```bash
-docker-compose restart novelclaw
+docker compose restart novelclaw
 ```
 
 ### 数据持久化
@@ -88,6 +92,7 @@ docker-compose restart novelclaw
 以下目录通过卷挂载实现数据持久化：
 - `apps/auth-portal/local_web_portal/data` - 认证门户数据库
 - `apps/multiagent/local_web_portal/data` - 多智能体数据
+- `apps/multiagent/local_web_portal/runs` - 多智能体运行记录和输出
 - `apps/novelclaw/local_web_portal/data` - NovelClaw 数据库
 - `apps/novelclaw/local_web_portal/runs` - 写作运行记录和输出
 
@@ -99,17 +104,22 @@ docker-compose restart novelclaw
 ports:
   - "9010:8010"  # 将 9010 改为你想要的端口
 ```
+如果你修改了 MultiAgent 或 NovelClaw 的宿主机端口，启动 Compose 前同步设置 `APP_MULTIAGENT_PORT` 或 `APP_CLAW_PORT`，这样 `/select-mode` 才会跳到正确端口：
+```bash
+APP_MULTIAGENT_PORT=9011 APP_CLAW_PORT=9012 docker compose up -d
+```
 
 **权限问题**：
 在 Linux/Mac 上，可能需要调整权限：
 ```bash
 chmod -R 755 apps/*/local_web_portal/data
+chmod -R 755 apps/multiagent/local_web_portal/runs
 chmod -R 755 apps/novelclaw/local_web_portal/runs
 ```
 
 **查看容器状态**：
 ```bash
-docker-compose ps
+docker compose ps
 ```
 
 **进入容器调试**：

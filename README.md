@@ -171,10 +171,10 @@ cp .env.auth-portal.example apps/auth-portal/.env
 cp .env.multiagent.example apps/multiagent/.env
 cp .env.novelclaw.example apps/novelclaw/.env
 
-# 2. Edit .env files with your API keys
+# 2. Review .env files. API keys are optional until you run a cloud provider.
 
 # 3. Start services
-docker-compose up -d
+docker compose up -d
 ```
 
 🌐 Access URLs:
@@ -185,6 +185,8 @@ MultiAgent  http://localhost:8011/dashboard
 NovelClaw   http://localhost:8012/dashboard
 ```
 
+The portal keeps the host you opened (`localhost` or `127.0.0.1`) when it sends you to the workspace ports, so cross-port session cookies keep working in Docker.
+
 ✅ Docker benefits:
 
 - no Python environment setup required
@@ -193,6 +195,7 @@ NovelClaw   http://localhost:8012/dashboard
 - data persistence through volumes
 
 📖 See [DOCKER_DEPLOYMENT.md](DOCKER_DEPLOYMENT.md) for detailed Docker deployment guide.
+🤖 CLI/agent automation can use the token API in [docs/AGENT_API.md](docs/AGENT_API.md).
 
 </details>
 

@@ -167,6 +167,23 @@ def _shared_path(path: str) -> str:
     return normalized
 
 
+def _external_host(request: Request) -> str:
+    host = request.url.hostname or "localhost"
+    if host in {"0.0.0.0", "::"}:
+        host = "localhost"
+    if ":" in host and not host.startswith("["):
+        return f"[{host}]"
+    return host
+
+
+def _shared_portal_url(request: Request, path: str) -> str:
+    normalized = (path or "").strip() or "/select-mode"
+    normalized = normalized if normalized.startswith("/") else f"/{normalized}"
+    if settings.shared_portal_url:
+        return f"{settings.shared_portal_url}{normalized}"
+    return urlunsplit((request.url.scheme, f"{_external_host(request)}:{settings.shared_portal_port}", normalized, "", ""))
+
+
 def _app_path(path: str) -> str:
     normalized = _shared_path(path)
     if _is_shared_portal_path(normalized) and settings.shared_portal_url:
@@ -227,6 +244,11 @@ templates.env.globals["app_path"] = _app_path
 templates.env.globals["shared_path"] = _shared_path
 templates.env.globals["current_public_path"] = _current_public_path
 templates.env.globals["app_base_path"] = settings.base_path
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
 
 
 def _workspace_payload(
@@ -1101,6 +1123,13 @@ def index(request: Request, db: Session = Depends(get_db)):
     if _current_user(request, db):
         return _redirect("/dashboard")
     return _redirect("/select-mode")
+
+
+@app.get("/select-mode")
+@app.get("/mode-a")
+@app.get("/mode-b")
+def shared_portal_entry(request: Request):
+    return RedirectResponse(_shared_portal_url(request, request.url.path), status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/register")

@@ -3,6 +3,7 @@
 import json
 import os
 import re
+import secrets
 import shutil
 import threading
 import zipfile
@@ -12,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 from urllib.parse import quote_plus, urlsplit, urlunsplit
 
-from fastapi import Depends, FastAPI, Form, HTTPException, Request, status
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, status
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
@@ -518,6 +519,23 @@ def _shared_path(path: str) -> str:
     return normalized
 
 
+def _external_host(request: Request) -> str:
+    host = request.url.hostname or "localhost"
+    if host in {"0.0.0.0", "::"}:
+        host = "localhost"
+    if ":" in host and not host.startswith("["):
+        return f"[{host}]"
+    return host
+
+
+def _shared_portal_url(request: Request, path: str) -> str:
+    normalized = (path or "").strip() or "/select-mode"
+    normalized = normalized if normalized.startswith("/") else f"/{normalized}"
+    if settings.shared_portal_url:
+        return f"{settings.shared_portal_url}{normalized}"
+    return urlunsplit((request.url.scheme, f"{_external_host(request)}:{settings.shared_portal_port}", normalized, "", ""))
+
+
 def _app_path(path: str) -> str:
     normalized = _shared_path(path)
     if _is_shared_portal_path(normalized) and settings.shared_portal_url:
@@ -599,6 +617,11 @@ templates.env.globals["static_asset_path"] = _static_asset_path
 templates.env.globals["shared_path"] = _shared_path
 templates.env.globals["current_public_path"] = _current_public_path
 templates.env.globals["app_base_path"] = settings.base_path
+
+
+@app.get("/healthz")
+def healthz():
+    return {"ok": True}
 
 
 def _tail_text(path: Path, max_chars: int = 12000) -> str:
@@ -703,6 +726,36 @@ def _provider_specs_for_user(db: Session, user_id: int) -> Dict[str, ProviderSpe
     return merge_provider_specs(base_specs, custom_specs.values(), allow_override=False)
 
 
+def _all_provider_specs_for_user(db: Session, user_id: int) -> Dict[str, ProviderSpec]:
+    base_specs = get_provider_specs(settings)
+    custom_specs = _custom_provider_specs_for_user(db, user_id)
+    return merge_provider_specs(base_specs, custom_specs.values(), allow_override=False)
+
+
+def _env_api_key_for_provider(provider: str) -> str:
+    slug = normalize_slug(provider)
+    names = []
+    if slug:
+        names.append(f"{slug.upper().replace('-', '_')}_API_KEY")
+    if slug == "openai":
+        names.append("OPENAI_API_KEY")
+    elif slug == "codex":
+        names.append("CODEX_API_KEY")
+    names.append("LLM_API_KEY")
+
+    seen = set()
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        value = str(os.getenv(name, "") or "").strip()
+        lowered = value.lower()
+        if not value or lowered.startswith("your-") or lowered.startswith("change-"):
+            continue
+        return value
+    return ""
+
+
 def _provider_api_key(db: Session, user_id: int, provider: str) -> str:
     row = db.execute(
         select(ApiCredential).where(
@@ -710,12 +763,16 @@ def _provider_api_key(db: Session, user_id: int, provider: str) -> str:
             ApiCredential.provider == provider,
         )
     ).scalar_one_or_none()
-    if not row:
-        raise ValueError("Save your API key for that provider first")
-    try:
-        return decrypt_api_key(row.encrypted_key)
-    except Exception as exc:
-        raise ValueError(f"Failed to decrypt API key: {exc}") from exc
+    if row:
+        try:
+            return decrypt_api_key(row.encrypted_key)
+        except Exception as exc:
+            raise ValueError(f"Failed to decrypt API key: {exc}") from exc
+
+    env_key = _env_api_key_for_provider(provider)
+    if env_key:
+        return env_key
+    raise ValueError("Save your API key for that provider first")
 
 
 def _load_console_jobs(db: Session, user_id: int, limit: int = 20) -> List[GenerationJob]:
@@ -2643,6 +2700,402 @@ def _start_generation_worker(job_id: int) -> None:
     worker.start()
 
 
+def _extract_bearer_token(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+    if raw.lower().startswith("bearer "):
+        return raw[7:].strip()
+    return ""
+
+
+def _require_agent_token(
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
+    authorization: str | None = Header(default=None),
+) -> None:
+    expected = str(settings.agent_api_key or "").strip()
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Agent API is disabled. Set APP_AGENT_API_KEY to enable /api/v1 endpoints.",
+        )
+    supplied = str(x_api_key or "").strip() or _extract_bearer_token(authorization)
+    if not supplied or not secrets.compare_digest(supplied, expected):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid agent API key")
+
+
+def _agent_user(db: Session) -> User:
+    email = settings.agent_user_email
+    user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+    if user:
+        return user
+    user = User(email=email, password_hash="agent-api")
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+async def _json_payload(request: Request) -> Dict[str, object]:
+    try:
+        payload = await request.json()
+    except Exception as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expected JSON body") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Expected JSON object")
+    return payload
+
+
+def _payload_bool(value: object, default: bool = False) -> bool:
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    raw = str(value).strip().lower()
+    if raw in {"1", "true", "yes", "on"}:
+        return True
+    if raw in {"0", "false", "no", "off"}:
+        return False
+    return default
+
+
+def _payload_text(payload: Dict[str, object], *names: str) -> str:
+    for name in names:
+        value = payload.get(name)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            return text
+    return ""
+
+
+def _select_agent_provider(db: Session, user_id: int, raw_provider: str) -> str:
+    provider_specs = _all_provider_specs_for_user(db, user_id)
+    provider = normalize_slug(raw_provider or settings.default_provider)
+    if not provider and provider_specs:
+        provider = next(iter(provider_specs.keys()))
+    if provider not in provider_specs:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported provider: {provider or raw_provider}")
+    return provider
+
+
+def _build_agent_idea(payload: Dict[str, object]) -> str:
+    idea = _payload_text(payload, "premise", "brief", "idea", "story", "summary")
+    if not idea:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Missing story premise. Use premise, brief, or idea.")
+
+    metadata = payload.get("metadata")
+    if not isinstance(metadata, dict):
+        metadata = {}
+
+    metadata_lines: List[str] = []
+    for key in (
+        "title",
+        "genre",
+        "tone",
+        "audience",
+        "style",
+        "constraints",
+        "preferred_language",
+        "source_language",
+        "requested_chapters",
+        "chapter_pause_mode",
+        "generation_scope",
+    ):
+        value = payload.get(key, metadata.get(key))
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            metadata_lines.append(f"{key}: {text}")
+
+    if not metadata_lines:
+        return idea
+    return f"{idea}\n\nAgent API metadata:\n" + "\n".join(metadata_lines)
+
+
+def _upsert_api_key(db: Session, user_id: int, provider: str, api_key: str) -> ApiCredential:
+    key = str(api_key or "").strip()
+    if not key:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="api_key cannot be empty")
+
+    cred = db.execute(
+        select(ApiCredential).where(
+            ApiCredential.user_id == user_id,
+            ApiCredential.provider == provider,
+        )
+    ).scalar_one_or_none()
+
+    encrypted = encrypt_api_key(key)
+    if cred:
+        cred.encrypted_key = encrypted
+        cred.key_hint = _mask_hint(key)
+    else:
+        cred = ApiCredential(
+            user_id=user_id,
+            provider=provider,
+            encrypted_key=encrypted,
+            key_hint=_mask_hint(key),
+        )
+        db.add(cred)
+    db.commit()
+    db.refresh(cred)
+    return cred
+
+
+def _agent_job(db: Session, user_id: int, story_id: int) -> GenerationJob:
+    job = db.get(GenerationJob, story_id)
+    if not job or job.user_id != user_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Story not found")
+    return job
+
+
+def _start_agent_job(db: Session, user_id: int, job: GenerationJob) -> GenerationJob:
+    if _modelless_mode_enabled():
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Generation is disabled because WEB_MODELLESS_MODE=1. Set WEB_MODELLESS_MODE=0 before starting agent runs.",
+        )
+    provider_specs = _provider_specs_for_user(db, user_id)
+    if job.provider not in provider_specs:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Unsupported provider: {job.provider}")
+    try:
+        _provider_api_key(db, user_id, job.provider)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(exc)) from exc
+
+    if job.status == "queued":
+        _start_generation_worker(job.id)
+    elif job.status in {"running", "succeeded"}:
+        return job
+    else:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"Cannot start story with status {job.status}")
+    db.refresh(job)
+    return job
+
+
+def _job_progress_payload(job: GenerationJob) -> Dict[str, object]:
+    worker_log_text = ""
+    progress_log_text = ""
+    run_dir: Optional[Path] = None
+    chapters: List[Dict] = []
+    if job.run_id:
+        run_dir = _resolve_run_dir(job.run_id)
+        worker_log_text = _tail_text(run_dir / "worker.log")
+        progress_log_text = _tail_text(run_dir / "progress.log")
+        chapters = _load_chapter_outputs(run_dir)
+    try:
+        progress_snapshot = _build_progress_snapshot(job, run_dir, worker_log_text, progress_log_text)
+    except Exception:
+        progress_snapshot = _default_progress_snapshot(_job_language(job))
+    return {
+        "progress_snapshot": progress_snapshot,
+        "chapter_count": len(chapters),
+        "worker_log_tail": worker_log_text,
+        "progress_log_tail": progress_log_text,
+    }
+
+
+def _api_job_payload(job: GenerationJob, *, include_logs: bool = False) -> Dict[str, object]:
+    progress = _job_progress_payload(job)
+    payload = {
+        "story_id": job.id,
+        "job_id": job.id,
+        "provider": job.provider,
+        "status": job.status,
+        "run_id": job.run_id or "",
+        "premise": job.idea,
+        "result_excerpt": job.result_excerpt or "",
+        "error_message": job.error_message or "",
+        "output_path": job.output_path or "",
+        "created_at": job.created_at.isoformat() if job.created_at else "",
+        "updated_at": job.updated_at.isoformat() if job.updated_at else "",
+        "finished_at": job.finished_at.isoformat() if job.finished_at else "",
+        "chapter_count": progress["chapter_count"],
+        "progress_snapshot": progress["progress_snapshot"],
+    }
+    if include_logs:
+        payload["worker_log_tail"] = progress["worker_log_tail"]
+        payload["progress_log_tail"] = progress["progress_log_tail"]
+    return payload
+
+
+def _api_chapters_payload(job: GenerationJob, include_content: bool = True) -> List[Dict[str, object]]:
+    if not job.run_id:
+        return []
+    chapters = _load_chapter_outputs(_resolve_run_dir(job.run_id))
+    if include_content:
+        return chapters
+    return [{k: v for k, v in item.items() if k != "content"} for item in chapters]
+
+
+@app.get("/api/v1/health")
+def api_v1_health(_: None = Depends(_require_agent_token)):
+    return {"ok": True, "modelless_mode": _modelless_mode_enabled()}
+
+
+@app.get("/api/v1/providers")
+def api_v1_providers(_: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    provider_specs = _all_provider_specs_for_user(db, user.id)
+    rows = db.execute(select(ApiCredential).where(ApiCredential.user_id == user.id)).scalars().all()
+    cred_map = {row.provider: row for row in rows}
+    providers = []
+    for slug, spec in provider_specs.items():
+        configured = bool(slug in cred_map or _env_api_key_for_provider(slug))
+        providers.append(
+            {
+                "slug": slug,
+                "label": spec.label,
+                "base_url": spec.base_url,
+                "model": spec.model,
+                "wire_api": spec.wire_api,
+                "has_api_key": configured,
+                "key_hint": cred_map[slug].key_hint if slug in cred_map else ("env" if _env_api_key_for_provider(slug) else ""),
+            }
+        )
+    return {"modelless_mode": _modelless_mode_enabled(), "default_provider": settings.default_provider, "providers": providers}
+
+
+@app.post("/api/v1/providers")
+async def api_v1_save_provider(request: Request, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    payload = await _json_payload(request)
+    slug = normalize_slug(_payload_text(payload, "slug", "provider"))
+    base_url = _payload_text(payload, "base_url")
+    model = _payload_text(payload, "model")
+    label = _payload_text(payload, "label") or slug.upper()
+    wire_api = normalize_wire_api(_payload_text(payload, "wire_api", "wire_mode") or "chat")
+    if not is_valid_slug(slug):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid provider slug")
+    if not base_url or not model:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="base_url and model are required")
+
+    row = db.execute(
+        select(ProviderConfig).where(
+            ProviderConfig.user_id == user.id,
+            ProviderConfig.slug == slug,
+        )
+    ).scalar_one_or_none()
+    if row:
+        row.label = label
+        row.base_url = base_url
+        row.model = model
+        row.wire_api = wire_api
+    else:
+        row = ProviderConfig(user_id=user.id, slug=slug, label=label, base_url=base_url, model=model, wire_api=wire_api)
+        db.add(row)
+    db.commit()
+
+    api_key = _payload_text(payload, "api_key")
+    if api_key:
+        _upsert_api_key(db, user.id, slug, api_key)
+    return {"ok": True, "provider": {"slug": slug, "label": label, "base_url": base_url, "model": model, "wire_api": wire_api}}
+
+
+@app.post("/api/v1/providers/{provider}/api-key")
+async def api_v1_save_provider_key(provider: str, request: Request, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    provider = _select_agent_provider(db, user.id, provider)
+    payload = await _json_payload(request)
+    api_key = _payload_text(payload, "api_key", "key", "token")
+    cred = _upsert_api_key(db, user.id, provider, api_key)
+    return {"ok": True, "provider": provider, "key_hint": cred.key_hint}
+
+
+@app.post("/api/v1/stories")
+async def api_v1_create_story(request: Request, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    payload = await _json_payload(request)
+    provider = _select_agent_provider(db, user.id, _payload_text(payload, "provider"))
+    idea = _build_agent_idea(payload)
+    job = _create_generation_job(db, user.id, provider, idea)
+    if _payload_bool(payload.get("start"), default=_payload_bool(payload.get("auto_start"), default=False)):
+        job = _start_agent_job(db, user.id, job)
+    return JSONResponse(_api_job_payload(job), status_code=status.HTTP_201_CREATED)
+
+
+@app.get("/api/v1/stories/{story_id}")
+def api_v1_get_story(
+    story_id: int,
+    include_logs: bool = False,
+    _: None = Depends(_require_agent_token),
+    db: Session = Depends(get_db),
+):
+    user = _agent_user(db)
+    job = _agent_job(db, user.id, story_id)
+    return _api_job_payload(job, include_logs=include_logs)
+
+
+@app.post("/api/v1/stories/{story_id}/start")
+def api_v1_start_story(story_id: int, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    job = _agent_job(db, user.id, story_id)
+    job = _start_agent_job(db, user.id, job)
+    return _api_job_payload(job)
+
+
+@app.post("/api/v1/stories/{story_id}/cancel")
+def api_v1_cancel_story(story_id: int, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    job = _agent_job(db, user.id, story_id)
+    canceled = _cancel_generation_job(job, reason=f"[agent-api] canceled via /api/v1/stories/{story_id}/cancel.")
+    if canceled:
+        db.commit()
+    return {"ok": True, "canceled": canceled, "story": _api_job_payload(job)}
+
+
+@app.get("/api/v1/stories/{story_id}/chapters")
+def api_v1_story_chapters(
+    story_id: int,
+    include_content: bool = True,
+    _: None = Depends(_require_agent_token),
+    db: Session = Depends(get_db),
+):
+    user = _agent_user(db)
+    job = _agent_job(db, user.id, story_id)
+    chapters = _api_chapters_payload(job, include_content=include_content)
+    return {"story_id": job.id, "status": job.status, "run_id": job.run_id or "", "chapter_count": len(chapters), "chapters": chapters}
+
+
+@app.get("/api/v1/stories/{story_id}/chapters/{chapter_no}")
+def api_v1_story_chapter(story_id: int, chapter_no: int, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    job = _agent_job(db, user.id, story_id)
+    if not job.run_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No chapter output available yet")
+    chapter_path = _latest_chapter_file(_resolve_run_dir(job.run_id), chapter_no)
+    if not chapter_path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter output not found")
+    content = chapter_path.read_text(encoding="utf-8", errors="replace")
+    return {"story_id": job.id, "chapter": chapter_no, "filename": chapter_path.name, "content": content}
+
+
+@app.get("/api/v1/stories/{story_id}/export")
+def api_v1_story_export(story_id: int, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
+    user = _agent_user(db)
+    job = _agent_job(db, user.id, story_id)
+    file_name = f"story_{job.id}_{job.run_id or 'no_run'}_export.txt"
+    if job.output_path:
+        out_path = Path(job.output_path)
+        if out_path.exists() and out_path.is_file():
+            return FileResponse(str(out_path), media_type="text/plain; charset=utf-8", filename=file_name)
+
+    chapters = _api_chapters_payload(job, include_content=True)
+    if not chapters:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No output available yet")
+    parts = []
+    for item in chapters:
+        parts.append(f"Chapter {item.get('chapter', '?')}\n\n{str(item.get('content') or '').strip()}")
+    merged = ("\n\n" + ("=" * 60) + "\n\n").join(parts)
+    return PlainTextResponse(
+        merged,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
+    )
+
+
 def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
     if dt is None:
         return None
@@ -3261,6 +3714,13 @@ def index(request: Request, db: Session = Depends(get_db)):
     if _current_user(request, db):
         return _redirect("/dashboard")
     return _redirect("/select-mode")
+
+
+@app.get("/select-mode")
+@app.get("/mode-a")
+@app.get("/mode-b")
+def shared_portal_entry(request: Request):
+    return RedirectResponse(_shared_portal_url(request, request.url.path), status_code=status.HTTP_303_SEE_OTHER)
 
 
 @app.get("/register")

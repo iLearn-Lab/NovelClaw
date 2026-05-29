@@ -1,5 +1,9 @@
 version: '3.8'
 
+x-shared-app-env: &shared-app-env
+  APP_SESSION_SECRET: ${APP_SESSION_SECRET:-novelclaw-local-docker-session-secret-change-me}
+  APP_SESSION_COOKIE_NAME: ${APP_SESSION_COOKIE_NAME:-novelclaw_session}
+
 services:
   auth-portal:
     build: .
@@ -10,9 +14,19 @@ services:
       - "8010:8010"
     volumes:
       - ./apps/auth-portal/local_web_portal/data:/app/apps/auth-portal/local_web_portal/data
-      - ./apps/auth-portal/.env:/app/apps/auth-portal/.env
+      - ./apps/auth-portal/.env:/app/apps/auth-portal/.env:ro
     environment:
-      - PYTHONUNBUFFERED=1
+      <<: *shared-app-env
+      PYTHONUNBUFFERED: "1"
+      APP_MULTIAGENT_PORT: ${APP_MULTIAGENT_PORT:-8011}
+      APP_CLAW_PORT: ${APP_CLAW_PORT:-8012}
+      WEB_UI_LANGUAGE: ${WEB_UI_LANGUAGE:-zh}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/healthz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     networks:
       - novelclaw-network
@@ -26,9 +40,20 @@ services:
       - "8011:8011"
     volumes:
       - ./apps/multiagent/local_web_portal/data:/app/apps/multiagent/local_web_portal/data
-      - ./apps/multiagent/.env:/app/apps/multiagent/.env
+      - ./apps/multiagent/local_web_portal/runs:/app/apps/multiagent/local_web_portal/runs
+      - ./apps/auth-portal/local_web_portal/data:/app/apps/auth-portal/local_web_portal/data
+      - ./apps/multiagent/.env:/app/apps/multiagent/.env:ro
     environment:
-      - PYTHONUNBUFFERED=1
+      <<: *shared-app-env
+      PYTHONUNBUFFERED: "1"
+      APP_AUTH_DATABASE_URL: sqlite:////app/apps/auth-portal/local_web_portal/data/app.db
+      APP_SHARED_PORTAL_PORT: ${APP_SHARED_PORTAL_PORT:-8010}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8011/healthz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     networks:
       - novelclaw-network
@@ -43,9 +68,21 @@ services:
     volumes:
       - ./apps/novelclaw/local_web_portal/data:/app/apps/novelclaw/local_web_portal/data
       - ./apps/novelclaw/local_web_portal/runs:/app/apps/novelclaw/local_web_portal/runs
-      - ./apps/novelclaw/.env:/app/apps/novelclaw/.env
+      - ./apps/auth-portal/local_web_portal/data:/app/apps/auth-portal/local_web_portal/data
+      - ./apps/novelclaw/.env:/app/apps/novelclaw/.env:ro
     environment:
-      - PYTHONUNBUFFERED=1
+      <<: *shared-app-env
+      PYTHONUNBUFFERED: "1"
+      APP_AUTH_DATABASE_URL: sqlite:////app/apps/auth-portal/local_web_portal/data/app.db
+      APP_SHARED_PORTAL_PORT: ${APP_SHARED_PORTAL_PORT:-8010}
+      WEB_UI_LANGUAGE: ${WEB_UI_LANGUAGE:-zh}
+      WEB_MODELLESS_MODE: ${WEB_MODELLESS_MODE:-0}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8012/healthz', timeout=3).read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
     networks:
       - novelclaw-network

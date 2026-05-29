@@ -202,6 +202,30 @@ def _txt(language: Optional[str], zh: str, en: str) -> str:
     return en if _is_en(language) else zh
 
 
+def _env_api_key_for_provider(provider: str) -> str:
+    slug = normalize_slug(provider)
+    names = []
+    if slug:
+        names.append(f"{slug.upper().replace('-', '_')}_API_KEY")
+    if slug == "openai":
+        names.append("OPENAI_API_KEY")
+    elif slug == "codex":
+        names.append("CODEX_API_KEY")
+    names.append("LLM_API_KEY")
+
+    seen = set()
+    for name in names:
+        if name in seen:
+            continue
+        seen.add(name)
+        value = str(os.getenv(name, "") or "").strip()
+        lowered = value.lower()
+        if not value or lowered.startswith("your-") or lowered.startswith("change-"):
+            continue
+        return value
+    return ""
+
+
 def _job_language_profile(db: Session, job_id: int) -> tuple[str, str, str]:
     session = db.execute(
         select(IdeaCopilotSession)
@@ -433,7 +457,8 @@ def run_generation_job(job_id: int) -> None:
             ApiCredential.provider == job.provider,
         )
         credential = db.execute(cred_stmt).scalar_one_or_none()
-        if not credential:
+        raw_api_key = decrypt_api_key(credential.encrypted_key) if credential else _env_api_key_for_provider(job.provider)
+        if not raw_api_key:
             raise RuntimeError(_txt(preferred_language, "该提供商尚未保存 API Key。", "No API key saved for this provider."))
 
         run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_u{job.user_id}_j{job.id}"
@@ -441,7 +466,6 @@ def run_generation_job(job_id: int) -> None:
         job.updated_at = _utcnow()
         db.commit()
 
-        raw_api_key = decrypt_api_key(credential.encrypted_key)
         provider_specs = merge_provider_specs(
             get_provider_specs(settings),
             _custom_provider_specs_for_user(db, job.user_id).values(),

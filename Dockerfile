@@ -32,6 +32,7 @@ RUN pip install --no-cache-dir -r /app/apps/novelclaw/requirements.txt && \
 # Create data directories
 RUN mkdir -p /app/apps/auth-portal/local_web_portal/data && \
     mkdir -p /app/apps/multiagent/local_web_portal/data && \
+    mkdir -p /app/apps/multiagent/local_web_portal/runs && \
     mkdir -p /app/apps/novelclaw/local_web_portal/data && \
     mkdir -p /app/apps/novelclaw/local_web_portal/runs
 

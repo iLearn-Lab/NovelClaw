@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
 load_dotenv(BASE_DIR / ".env", override=False)
+load_dotenv(BASE_DIR.parent / ".env", override=False)
 
 
 def _resolve_runs_dir() -> Path:
@@ -47,6 +48,7 @@ class Settings:
     session_cookie_name: str = env_or_default("APP_SESSION_COOKIE_NAME", "session")
     session_cookie_domain: str = os.getenv("APP_SESSION_COOKIE_DOMAIN", "").strip()
     shared_portal_url: str = os.getenv("APP_SHARED_PORTAL_URL", "").strip().rstrip("/")
+    shared_portal_port: str = os.getenv("APP_SHARED_PORTAL_PORT", "8010").strip() or "8010"
     auth_database_url: str = os.getenv("APP_AUTH_DATABASE_URL", "").strip()
     base_path: str = os.getenv("APP_BASE_PATH", "").strip().rstrip("/")
     default_provider: str = os.getenv("WEB_DEFAULT_PROVIDER", "deepseek").lower()
