@@ -65,10 +65,10 @@ Instead of treating long-form fiction as a single prompt submission, NovelClaw o
 
 That makes it a better fit for authors and builders who want stronger continuity, clearer iteration surfaces, and more direct control over chapter-level progress. 🎯
 
-- 📚 long-form fiction, serial writing, and chapter-by-chapter continuation
-- 🧠 memory-aware drafting with inspectable chapter output and reusable story state
-- 🤝 human-in-the-loop writing workflows with persistent control surfaces
-- 🔍 observable runs with logs, progress traces, chapters, downloads, and review pages
+- 📚 long-form fiction, serial writing, and chapter-by-chapter continuation.
+- 🧠 memory-aware drafting with inspectable chapter output and reusable story state.
+- 🤝 human-in-the-loop writing workflows with persistent control surfaces.
+- 🔍 observable runs with logs, progress traces, chapters, downloads, and review pages.
 
 <table>
   <tr>
