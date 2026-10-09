@@ -6,8 +6,6 @@
 from typing import Dict, List, Optional
 
 from config import Config
-from rag.document_processor import DocumentProcessor
-from rag.vector_store import VectorStore
 
 
 class Retriever:
@@ -17,10 +15,12 @@ class Retriever:
         self.config = config
         self.enabled = bool(getattr(config, "enable_rag", False))
         self.collection_name = collection_name
-        self.vector_store: Optional[VectorStore] = None
-        self.document_processor: Optional[DocumentProcessor] = None
+        self.vector_store = None
+        self.document_processor = None
 
         if self.enabled:
+            from rag.vector_store import VectorStore
+            from rag.document_processor import DocumentProcessor
             db_path = getattr(config, "knowledge_vector_db_path", None) or config.vector_db_path
             self.vector_store = VectorStore(config, collection_name, db_path=db_path)
             self.document_processor = DocumentProcessor(config)
@@ -77,6 +77,7 @@ class Retriever:
         return "\n".join(context_parts)
 
     def clear_knowledge_base(self):
+        from rag.vector_store import VectorStore
         if not self.enabled or self.vector_store is None:
             return
         self.vector_store.delete_collection()

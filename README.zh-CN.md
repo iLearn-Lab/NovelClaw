@@ -238,7 +238,7 @@ http://127.0.0.1:8010/select-mode -> http://127.0.0.1:8012/dashboard
 <summary><b>⌨️ 方案 B：手动 PowerShell 启动</b></summary>
 
 ```powershell
-.\scripts\setup-local-env.ps1 -Overwrite
+.\scripts\setup-local-env.ps1
 .\scripts\bootstrap-shared-venv.ps1
 .\scripts\start-all-local.ps1 -UseSharedVenv
 ```
@@ -383,3 +383,5 @@ chapters/
 - 🛠️ Deployment guide: [DEPLOYMENT.md](DEPLOYMENT.md)
 - 🔐 GitHub 安全说明: [WHAT_IS_SAFE_FOR_GITHUB.md](WHAT_IS_SAFE_FOR_GITHUB.md)
 - ⚖️ 许可证: [MIT](LICENSE)
+- 开发与自动化验证：[开发指南](docs/DEVELOPMENT.md)
+- 本轮优化内容：[工作台优化说明](docs/IMPROVEMENTS.zh-CN.md)

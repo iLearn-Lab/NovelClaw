@@ -254,7 +254,8 @@
     const workspaceRoot = root.closest("[data-idea-copilot-root]");
     const feed = workspaceRoot ? workspaceRoot.querySelector("[data-run-chat-feed]") : null;
     const chatBoard = workspaceRoot ? workspaceRoot.querySelector("[data-idea-feed]") : null;
-    if (!workspaceRoot || !feed || !chatBoard) return;
+    if (!workspaceRoot || !feed || !chatBoard || root.dataset.liveInitialized) return;
+    root.dataset.liveInitialized = "true";
 
     let controlsHost = workspaceRoot.querySelector("[data-chat-runtime-controls]");
     if (!controlsHost) {
@@ -283,6 +284,8 @@
     let isLive = true;
     let stopped = false;
     let previousSignature = "";
+    let previousFeedMarkup = null;
+    let previousControlsMarkup = null;
     let checkpointSignature = "";
     let questionPolling = false;
     let checkpointPolling = false;
@@ -363,6 +366,7 @@
     }
 
     function renderAll() {
+      const followOutput = chatBoard.scrollHeight - chatBoard.clientHeight - chatBoard.scrollTop < 80;
       const focusState = captureComposerState();
       const items = buildDisplayItems(parseTraceEntries(currentProgressLog));
       const openIds = new Set();
@@ -370,17 +374,19 @@
       const blocks = [renderTimeline(items, isLive, currentStatus, currentErrorMessage, currentProgressSnapshot)];
       if (currentQuestion) blocks.push(renderQuestion(currentQuestion, questionSending));
       if (currentCheckpoint) blocks.push(renderCheckpoint(currentCheckpoint, checkpointSending, checkpointMemoryDrafts));
-      feed.innerHTML = blocks.join("\n");
+      const markup = blocks.join("\n");
+      if (markup !== previousFeedMarkup) { feed.innerHTML = markup; previousFeedMarkup = markup; }
       feed.querySelectorAll(".tool-call-card").forEach((node) => {
         if (openIds.has(node.dataset.tcId)) node.classList.add("tc-open");
       });
       const currentCard = feed.querySelector(".tool-call-card.tc-running, .tool-call-card.tc-ask");
       if (currentCard && !currentCard.classList.contains("tc-open")) currentCard.classList.add("tc-open");
-      controlsHost.innerHTML = renderInterruptBar(!!currentRunId && isLive && !stopped, interruptSending, interruptStatus);
+      const controlsMarkup = renderInterruptBar(!!currentRunId && isLive && !stopped, interruptSending, interruptStatus);
+      if (controlsMarkup !== previousControlsMarkup) { controlsHost.innerHTML = controlsMarkup; previousControlsMarkup = controlsMarkup; }
       controlsHost.hidden = !controlsHost.innerHTML;
       restoreComposerState(focusState);
       const signature = `${currentProgressLog.length}|${currentQuestion || ""}|${currentCheckpoint ? `${currentCheckpoint.chapter || ""}-${currentCheckpoint.ts || ""}` : ""}|${interruptStatus}`;
-      if (signature !== previousSignature && !(focusState && focusState.area)) {
+      if (signature !== previousSignature && followOutput && !(focusState && focusState.area)) {
         previousSignature = signature;
         scrollToBottom();
       } else {
@@ -388,8 +394,8 @@
       }
     }
 
-    async function refreshStatus() {
-      const response = await fetch(appPath(`/api/idea-copilot/${sessionId}/live`), { cache: "no-store" });
+    async function refreshStatus(signal) {
+      const response = await fetch(appPath(`/api/idea-copilot/${sessionId}/live`), { cache: "no-store", signal });
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Failed to fetch live status");
       currentRunId = data.run_id || currentRunId;
@@ -401,24 +407,25 @@
       renderAll();
     }
 
-    async function pollQuestion() {
+    async function pollQuestion(signal) {
       if (!currentRunId || questionPolling || stopped) return;
       questionPolling = true;
       try {
-        const response = await fetch(appPath(`/api/runs/${currentRunId}/pending-question`), { cache: "no-store" });
+        const response = await fetch(appPath(`/api/runs/${currentRunId}/pending-question`), { cache: "no-store", signal });
+        if (!response.ok) throw new Error("Live state unavailable");
         const data = await response.json();
         currentQuestion = data.pending && data.question ? data.question : null;
         if (!currentQuestion) questionSending = false;
         renderAll();
-      } catch (_) {}
-      questionPolling = false;
+      } finally { questionPolling = false; }
     }
 
-    async function pollCheckpoint() {
+    async function pollCheckpoint(signal) {
       if (!currentRunId || checkpointPolling || stopped) return;
       checkpointPolling = true;
       try {
-        const response = await fetch(appPath(`/api/runs/${currentRunId}/chapter-complete`), { cache: "no-store" });
+        const response = await fetch(appPath(`/api/runs/${currentRunId}/chapter-complete`), { cache: "no-store", signal });
+        if (!response.ok) throw new Error("Live state unavailable");
         const data = await response.json();
         currentCheckpoint = data.pending ? data : null;
         if (!currentCheckpoint) {
@@ -438,8 +445,7 @@
           }
         }
         renderAll();
-      } catch (_) {}
-      checkpointPolling = false;
+      } finally { checkpointPolling = false; }
     }
 
     async function sendQuestionReply() {
@@ -578,25 +584,19 @@
       }
     });
 
-    let timer = null;
-    async function tick() {
-      try {
-        await refreshStatus();
-        await pollQuestion();
-        await pollCheckpoint();
-        if (!isLive && !currentQuestion && !currentCheckpoint) {
-          stopped = true;
-          renderAll();
-          if (timer) {
-            window.clearInterval(timer);
-            timer = null;
-          }
-        }
-      } catch (_) {}
-    }
-
-    tick();
-    timer = window.setInterval(tick, 800);
+    window.NovelClawLive.poll(async (signal) => {
+      await refreshStatus(signal);
+      if (!isLive) {
+        stopped = true;
+        currentQuestion = null;
+        currentCheckpoint = null;
+        renderAll();
+        return false;
+      }
+      await pollQuestion(signal);
+      await pollCheckpoint(signal);
+      return true;
+    }, { interval: 1500 });
   }
 
   window.initChatRunLive = init;

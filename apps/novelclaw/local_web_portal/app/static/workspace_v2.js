@@ -10,7 +10,7 @@
   const txt = (k, d) => String(ui[k] || d || "");
   const isZh = String(document.documentElement.lang || "").toLowerCase().startsWith("zh");
   const l = (zh, en) => (isZh ? zh : en);
-  const esc = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const esc = (v) => String(v || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
   const preview = (v, n) => {
     const s = String(v || "").replace(/\s+/g, " ").trim();
     return !s ? "" : (s.length <= n ? s : `${s.slice(0, Math.max(0, n - 3))}...`);
@@ -545,31 +545,34 @@
     try { const r = await fetch(appPath(`/api/runs/${runId}/memory-banks/${b.slug}/entries/${id}`), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ topic, content, source: "manual_workspace" }) }); if (!r.ok) throw new Error(); const j = await r.json(); groups = Array.isArray(j.groups) ? j.groups : groups; s.bank = b.slug; s.entry = j.entry && j.entry.id ? j.entry.id : id; renderMemory(); setStatus(txt("saved", "Saved."), false); } catch (_) { setStatus(txt("saveFailed", "Save failed. Try again shortly."), true); }
   }
 
+  let draftSaving = false;
   async function saveDraft() {
+    if (draftSaving) return;
     const r = cur();
     const draft = r && r.draft ? r.draft : null;
     const content = String(refs.draftContent ? refs.draftContent.value : "");
     if (!runId || !draft || !content.trim()) { setManuscriptStatus(txt("draftEditorEmpty", "There is no chapter draft to edit yet."), true); return; }
     setManuscriptStatus(txt("saving", "Saving..."), false);
+    draftSaving = true;
     try {
       const resp = await fetch(appPath(`/api/runs/${runId}/chapters/${draft.chapter}/content`), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, base_content: draft.content }),
       });
-      if (!resp.ok) throw new Error();
       const j = await resp.json();
+      if (!resp.ok) throw new Error(j.detail || txt("saveFailed", "Save failed. Try again shortly."));
       const updated = j.chapter || {};
       draft.content = String(updated.content || "").trim();
       draft.title = String(updated.title || line1(draft.content) || draft.filename || draft.title || "");
       draft.preview = preview(draft.content, 140);
       draft.pages = pagesOf(draft.content);
       draft.length = draft.content.length;
-      renderManuscript();
+      if (cur()?.draft === draft && refs.draftContent?.value === content) renderManuscript();
       setManuscriptStatus(txt("draftSaved", "Chapter draft saved."), false);
-    } catch (_) {
-      setManuscriptStatus(txt("saveFailed", "Save failed. Try again shortly."), true);
-    }
+    } catch (error) {
+      setManuscriptStatus(error.message || txt("saveFailed", "Save failed. Try again shortly."), true);
+    } finally { draftSaving = false; }
   }
 
   async function saveOutline() {

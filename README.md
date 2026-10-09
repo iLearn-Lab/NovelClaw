@@ -225,7 +225,7 @@ http://127.0.0.1:8010/select-mode -> http://127.0.0.1:8012/dashboard
 ✅ What this script does:
 
 - stops old listeners on `8010`, `8011`, and `8012`
-- writes local `.env` files from safe defaults
+- creates missing local `.env` files and preserves existing settings
 - prepares a shared `.venv-shared`
 - starts `Portal`, `MultiAgent`, and `NovelClaw`
 
@@ -235,7 +235,7 @@ http://127.0.0.1:8010/select-mode -> http://127.0.0.1:8012/dashboard
 <summary><b>⌨️ Option B: Manual PowerShell Startup</b></summary>
 
 ```powershell
-.\scripts\setup-local-env.ps1 -Overwrite
+.\scripts\setup-local-env.ps1
 .\scripts\bootstrap-shared-venv.ps1
 .\scripts\start-all-local.ps1 -UseSharedVenv
 ```
@@ -380,3 +380,5 @@ See [DEPLOYMENT.md](DEPLOYMENT.md), [docs/DEPLOYMENT.zh-CN.md](docs/DEPLOYMENT.z
 - 🛠️ 部署说明: [docs/DEPLOYMENT.zh-CN.md](docs/DEPLOYMENT.zh-CN.md)
 - 🔐 GitHub safety notes: [WHAT_IS_SAFE_FOR_GITHUB.md](WHAT_IS_SAFE_FOR_GITHUB.md)
 - ⚖️ License: [MIT](LICENSE)
+- Development and automated checks: [Development guide](docs/DEVELOPMENT.md)
+- Workspace improvements: [Optimization notes (Chinese)](docs/IMPROVEMENTS.zh-CN.md)

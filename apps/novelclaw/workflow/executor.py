@@ -1305,71 +1305,52 @@ Hard requirements:
         return results
     
     def _build_agent_prompt(
-        self,
-        agent_name: str,
-        topic: str,
-        context: str,
-        target_length: Optional[int] = None
+        self, agent_name: str, topic: str, context: str,
+        target_length: Optional[int] = None,
     ) -> str:
-        """
-        构建Agent提示
-        
-        Args:
-            agent_name: Agent名称
-            topic: 主题
-            context: 上下文
-        
-        Returns:
-            提示文本
-        """
-        # 取最新的大纲作为章节锚点，减少跑偏
-        outline_text = ""
-        try:
-            outline_entry = self.memory_system.get_outline_by_topic(topic)
-            if outline_entry:
-                outline_text = outline_entry.get("content", "")
-        except Exception:
-            outline_text = ""
-
-        base_prompt = f"主题：{topic}\n"
-        if outline_text:
-            base_prompt += f"全局大纲：\n{outline_text}\n"
-        base_prompt += "\n"
-        
+        """Give each agent its own task while retaining established story context."""
+        outline = self.memory_system.get_outline_by_topic(topic) or {}
+        base = self._prompt(f"主题：{topic}\n", f"Topic: {topic}\n")
+        if outline.get("content"):
+            base += self._prompt("全局大纲：\n", "Global outline:\n") + outline["content"] + "\n"
         if context:
-            base_prompt += f"已有内容：\n{context}\n\n"
-        
+            base += self._prompt("已有内容：\n", "Existing context:\n") + context + "\n"
+        names = [str(c["name"]) for c in self.memory_system.get_characters_by_topic(topic) if c.get("name")]
+        names = list(dict.fromkeys([*self.main_characters, *names]))
+        if names:
+            base += self._prompt("保持人物姓名一致：", "Keep character names consistent: ") + ", ".join(names) + "\n"
         if agent_name == "plot":
-            return base_prompt + "请设计引人入胜的情节主线和分支，确保逻辑严密。"
-        elif agent_name == "character":
-            # 提供已有人物名单，避免改名
-            existing_chars = [c.get("name") for c in self.memory_system.get_characters_by_topic(topic)]
-            existing_hint = ""
-            if existing_chars:
-                existing_hint = f"\n已有人物（请保持姓名一致，勿随意改名）：{', '.join(existing_chars)}"
-            main_hint = ""
-            if self.main_characters:
-                main_hint = f"\n主角姓名锚定：{', '.join(self.main_characters)}，严禁改名、变更姓氏或使用其他称谓。"
-            tp_notes = self._get_recent_turning_point_notes(topic, limit=3)
-            tp_hint = ""
-            if tp_notes:
-                merged = '; '.join(tp_notes)
-                tp_hint = f"\n临近转折提示：{merged}"
-            ending_hint = "如本章为全书最后一章，请收束主线矛盾和伏笔，给出完整结局，避免悬而未决。"
-            min_words_hint = "本章字数请严格遵循本轮给定的章节长度区间。"
-            return base_prompt + (
-                "请基于以上设定写出连贯的正文段落，衔接自然，避免重复。"
-                "如需引入新人物/设定/规则，请先明确交代其来源、动机/用途、与现有设定或人物的关联，"
-                "避免凭空跳出，与既有世界观保持一致。"
-                + self._prompt(
-                    f"正文开头请写出章节标题：`第{self.chapter_counter}章 {outline_title}`（若有标题），其余不写小标题/Markdown标题。",
-                    "Do NOT include chapter headings or Markdown titles; continue directly in narrative prose. If needed, use seamless transitions instead of headings."
-                )
-                + length_tip + "\n" + chapter_tip + chapter_outline_tip + title_tip + main_hint + tp_hint + "\n" + min_words_hint + "\n" + ending_hint
+            return base + self._prompt(
+                "请设计引人入胜的情节主线和分支，确保因果严密。",
+                "Develop engaging plot and subplots with clear cause and effect.",
             )
-        else:
-            return base_prompt + "请基于已有内容继续生成相关内容。"
-    
+        if agent_name == "character":
+            return base + self._prompt(
+                "请完善人物动机、关系和行为约束，保持已有身份与性格的一致性。",
+                "Develop character motivations, relationships and behavioral constraints; preserve established identities.",
+            )
+        if agent_name == "world":
+            return base + self._prompt(
+                "请完善本章涉及的世界规则和场景边界，解释新设定与已有事实的联系。",
+                "Develop world rules and scene boundaries, connecting new details to established facts.",
+            )
+        if agent_name == "writer":
+            chapter_outline = self._get_chapter_outline_text(topic, self.chapter_counter)
+            title = self._get_chapter_outline_title(topic, self.chapter_counter)
+            base += self._prompt(f"当前章节：第{self.chapter_counter}章 {title}\n", f"Current chapter: {self.chapter_counter} {title}\n")
+            if chapter_outline:
+                base += self._prompt("章节大纲：\n", "Chapter outline:\n") + chapter_outline + "\n"
+            if target_length and target_length > 0:
+                base += self._prompt(f"目标长度：{target_length} 字。\n", f"Target length: {target_length} characters.\n")
+            notes = self._get_recent_turning_point_notes(topic, limit=3)
+            if notes:
+                base += self._prompt("转折提示：", "Turning points: ") + "; ".join(notes) + "\n"
+            return base + self._prompt(
+                "请输出连贯的章节正文，自然衔接已有内容。新人物或规则需交代来源，不要输出分析、提纲或 Markdown 标题。",
+                "Write coherent chapter prose continuing the existing story. Introduce new characters or rules with context. Output prose only, without analysis, outlines or Markdown headings.",
+            )
+        return base + self._prompt("请基于已有内容继续生成相关内容。", "Continue developing the existing material.")
+
     def _build_context(self, previous_content: List[Dict]) -> str:
         """
         构建上下文

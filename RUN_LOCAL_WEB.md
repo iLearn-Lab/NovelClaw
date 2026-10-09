@@ -24,9 +24,11 @@ http://127.0.0.1:8010/select-mode -> http://127.0.0.1:8012/dashboard
 This script will:
 
 1. Stop old listeners on `8010`, `8011`, and `8012`.
-2. Write local `.env` files from safe defaults.
+2. Create missing local `.env` files, preserving existing settings.
 3. Prepare the shared `.venv-shared`.
-4. Start `Portal`, `MultiAgent`, and `NovelClaw`.
+4. Start `Portal`, `MultiAgent`, and `NovelClaw` in the background and check readiness.
+
+Service logs are saved in each app's `local_web_portal/data/logs/` directory.
 
 ## One-Click Stop
 
@@ -37,7 +39,7 @@ This script will:
 ## Manual Startup
 
 ```powershell
-.\scripts\setup-local-env.ps1 -Overwrite
+.\scripts\setup-local-env.ps1
 .\scripts\bootstrap-shared-venv.ps1
 .\scripts\start-all-local.ps1 -UseSharedVenv
 ```

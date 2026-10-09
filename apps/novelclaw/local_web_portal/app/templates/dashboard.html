@@ -277,10 +277,10 @@
 
 {% if chat_session and not compose_new %}
 {% if not chat_session.final_job_id %}
-<script src="{{ static_asset_path('idea_copilot_live.js') }}?v=20260330x"></script>
+<script src="{{ static_asset_path('idea_copilot_live.js') }}?v=20261009"></script>
 {% endif %}
 {% if chat_session.final_job_id %}
-<script src="{{ static_asset_path('chat_run_live.js') }}?v=20260330x"></script>
+<script src="{{ static_asset_path('chat_run_live.js') }}?v=20261009"></script>
 {% endif %}
 <script>
   (function () {

@@ -1011,29 +1011,6 @@ class OpenClawManager:
             target_min_chars=state.get("chapter_min_required"),
             target_max_chars=state.get("chapter_max_allowed"),
         )
-        prompt = self.executor._prompt(
-            f"为第{self.executor.chapter_counter}章生成完整正文。\n"
-            f"主题：{state['topic']}  标题：{title or '未命名'}\n"
-            f"目标字数：{state['chapter_min_required']}–{state['chapter_max_allowed']}\n\n"
-            f"章节大纲：\n{outline or '（请基于已有剧情自然推进）'}\n\n"
-            f"辅助上下文：\n{support_context or '无'}\n\n"
-            f"动态记忆：\n{claw_context or '无'}\n\n"
-            "要求：只输出正文，不要标注、解释或提纲。",
-            f"Write the full prose for chapter {self.executor.chapter_counter}.\n"
-            f"Topic: {state['topic']}  Title: {title or 'Untitled'}\n"
-            f"Target: {state['chapter_min_required']}–{state['chapter_max_allowed']} chars\n\n"
-            f"Outline:\n{outline or '(advance naturally from established story)'}\n\n"
-            f"Support context:\n{support_context or 'none'}\n\n"
-            f"Dynamic memory:\n{claw_context or 'none'}\n\n"
-            "Output full prose only — no bullets, labels, or explanations.",
-        )
-        return self.executor.agents["writer"].generate(
-            prompt=prompt, context=support_context, topic=state["topic"],
-            genre=state.get("genre"), style_tags=state.get("style_tags"),
-            target_length=state.get("chapter_target"),
-            target_min_chars=state.get("chapter_min_required"),
-            target_max_chars=state.get("chapter_max_allowed"),
-        )
 
     def _planning_packet(self, state: Dict[str, Any], current_goal: str) -> Dict[str, Any]:
         return self.executor._build_planning_packet(

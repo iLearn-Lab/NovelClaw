@@ -8,7 +8,7 @@ if errorlevel 1 goto :fail
 
 echo.
 echo [2/4] Preparing local env files...
-powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\setup-local-env.ps1" -Overwrite
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\setup-local-env.ps1"
 if errorlevel 1 goto :fail
 
 echo.

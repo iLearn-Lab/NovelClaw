@@ -4,11 +4,14 @@
 """
 from typing import Any, Dict, List, Optional
 from datetime import datetime
+from uuid import uuid4
 import json
 import os
 import re
 import shutil
 from config import Config
+from pathlib import Path
+from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index
 
 
 class MemorySystem:
@@ -143,11 +146,10 @@ class MemorySystem:
         """加载记忆索引"""
         if os.path.exists(self.memory_index_path):
             try:
-                with open(self.memory_index_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                return load_memory_index(Path(self.memory_index_path))
             except:
-                return self._empty_memory_index()
-        return self._empty_memory_index()
+                return MemoryIndex(self._empty_memory_index())
+        return MemoryIndex(self._empty_memory_index())
 
     def _empty_memory_index(self) -> Dict[str, Any]:
         return {
@@ -181,8 +183,7 @@ class MemorySystem:
     def _save_memory_index(self):
         """保存记忆索引"""
         os.makedirs(os.path.dirname(self.memory_index_path), exist_ok=True)
-        with open(self.memory_index_path, "w", encoding="utf-8") as f:
-            json.dump(self.memory_index, f, ensure_ascii=False, indent=2)
+        save_memory_index(Path(self.memory_index_path), self.memory_index)
 
     def _should_use_vector_memory(self) -> bool:
         embed_name = str(getattr(self.config, "embedding_model", "") or "").strip().lower()
@@ -208,7 +209,7 @@ class MemorySystem:
         bank = bank if bank in self.CLAW_BANKS else "working_set"
         topic = str(topic or "global").strip() or "global"
         timestamp = datetime.now().isoformat()
-        memory_id = f"claw_{bank}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['claw'].get(bank, []))}"
+        memory_id = f"claw_{bank}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['claw'].get(bank, []))}" + "_" + uuid4().hex[:12]
         merged_metadata = {
             "type": "claw_memory",
             "bank": bank,
@@ -525,7 +526,7 @@ class MemorySystem:
         store_vector: bool = True,
         content_path: Optional[str] = None,
     ) -> str:
-        memory_id = f"text_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['texts'])}"
+        memory_id = f"text_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['texts'])}" + "_" + uuid4().hex[:12]
 
         if store_vector and self.vector_memory_enabled and self.document_processor is not None and self.memory_store is not None:
             processed_docs = self.document_processor.process_document(text)
@@ -559,7 +560,7 @@ class MemorySystem:
         topic: str,
         structure: Optional[Dict] = None
     ) -> str:
-        memory_id = f"outline_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['outlines'])}"
+        memory_id = f"outline_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['outlines'])}" + "_" + uuid4().hex[:12]
 
         if self.vector_memory_enabled and self.document_processor is not None and self.memory_store is not None:
             processed_docs = self.document_processor.process_document(outline)
@@ -589,7 +590,7 @@ class MemorySystem:
         topic: str,
         attributes: Optional[Dict] = None
     ) -> str:
-        memory_id = f"character_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['characters'])}"
+        memory_id = f"character_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['characters'])}" + "_" + uuid4().hex[:12]
 
         full_text = f"?????{character_name}\n\n{character_info}"
         if attributes:
@@ -624,7 +625,7 @@ class MemorySystem:
         setting_info: str,
         topic: str
     ) -> str:
-        memory_id = f"world_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['world_settings'])}"
+        memory_id = f"world_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['world_settings'])}" + "_" + uuid4().hex[:12]
 
         full_text = f"??????{setting_name}\n\n{setting_info}"
 
@@ -656,7 +657,7 @@ class MemorySystem:
         topic: str,
         position: Optional[str] = None
     ) -> str:
-        memory_id = f"plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['plot_points'])}"
+        memory_id = f"plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['plot_points'])}" + "_" + uuid4().hex[:12]
 
         if self.vector_memory_enabled and self.document_processor is not None and self.memory_store is not None:
             processed_docs = self.document_processor.process_document(plot_point)
@@ -687,7 +688,7 @@ class MemorySystem:
         card_type: str = "general",
         metadata: Optional[Dict] = None
     ) -> str:
-        memory_id = f"fact_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index.get('fact_cards', []))}"
+        memory_id = f"fact_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index.get('fact_cards', []))}" + "_" + uuid4().hex[:12]
 
         if self.vector_memory_enabled and self.document_processor is not None and self.memory_store is not None:
             processed_docs = self.document_processor.process_document(card_text)

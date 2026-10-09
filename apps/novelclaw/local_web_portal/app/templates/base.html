@@ -3,11 +3,13 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}WriteClaw Console{% endblock %}</title>
+  <title>{% block title %}NovelClaw{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ static_asset_path('style.css') }}?v=20260330x">
+  <link rel="stylesheet" href="{{ static_asset_path('accessibility.css') }}">
+  <script src="{{ static_asset_path('live_runtime.js') }}"></script>
   <meta name="app-base-path" content="{{ app_base_path }}">
   <script>
     window.__APP_BASE_PATH__ = {{ app_base_path|tojson }};
@@ -25,16 +27,22 @@
 <body class="{% if user %}console-body{% else %}auth-body{% endif %}">
   {% set page_content %}{% block content %}{% endblock %}{% endset %}
   {% if user %}
+  <a class="skip-link" href="#main-content">{{ ui_text('跳到主要内容', 'Skip to main content') }}</a>
+  <header class="mobile-workspace-bar">
+    <a href="{{ app_path('/console/chat') }}" class="mobile-workspace-brand">NovelClaw</a>
+    <button type="button" data-mobile-nav-toggle aria-controls="workspace-navigation" aria-expanded="false">{{ ui_text('导航', 'Navigation') }}</button>
+  </header>
+  <button type="button" class="workspace-nav-overlay" data-mobile-nav-close tabindex="-1" aria-label="{{ ui_text('关闭导航', 'Close navigation') }}"></button>
   <div class="console-shell">
-    <aside class="console-sidebar">
+    <aside class="console-sidebar" id="workspace-navigation">
       {% set session_suffix = '?session_id=' ~ active_session.id if active_session else '' %}
       {% set system_nav_active = active_nav in ['skills', 'mcp', 'agents', 'sessions', 'status', 'models', 'env'] %}
       <div>
         <div class="console-sidebar-head">
           <a href="{{ app_path('/console/chat') }}{{ session_suffix }}" class="console-brand">
-            <div class="console-brand-logo">WC</div>
+            <div class="console-brand-logo">NC</div>
             <div>
-              <div class="console-brand-title">WriteClaw</div>
+              <div class="console-brand-title">NovelClaw</div>
               <div class="console-brand-subtitle">{{ ui_texts.brand_subtitle }}</div>
             </div>
           </a>
@@ -131,9 +139,9 @@
       </div>
     </aside>
 
-    <main class="console-main">
-      {% if message %}<div class="console-alert ok">{{ message }}</div>{% endif %}
-      {% if error %}<div class="console-alert error">{{ error }}</div>{% endif %}
+    <main class="console-main" id="main-content" tabindex="-1">
+      {% if message %}<div class="console-alert ok" role="status">{{ message }}</div>{% endif %}
+      {% if error %}<div class="console-alert error" role="alert">{{ error }}</div>{% endif %}
       {{ page_content }}
     </main>
   </div>
@@ -141,6 +149,7 @@
     {{ page_content }}
   {% endif %}
   {% if user %}
+  <script src="{{ static_asset_path('navigation.js') }}"></script>
   <script>
     (function () {
       const key = "writeclaw.sidebar.collapsed";
@@ -148,14 +157,16 @@
       const button = document.querySelector("[data-sidebar-toggle]");
       if (!button || !body.classList.contains("console-body")) return;
       function apply(collapsed) {
+        if (window.matchMedia("(max-width: 800px)").matches) collapsed = false;
         body.classList.toggle("sidebar-collapsed", collapsed);
         button.setAttribute("aria-pressed", collapsed ? "true" : "false");
       }
-      apply(window.localStorage.getItem(key) === "1");
+      try { apply(window.localStorage.getItem(key) === "1"); } catch (_) { apply(false); }
       button.addEventListener("click", function () {
+        if (window.matchMedia("(max-width: 800px)").matches) return;
         const next = !body.classList.contains("sidebar-collapsed");
         apply(next);
-        window.localStorage.setItem(key, next ? "1" : "0");
+        try { window.localStorage.setItem(key, next ? "1" : "0"); } catch (_) {}
       });
     })();
   </script>
@@ -203,7 +214,7 @@
         const cleaned = String(next).trim();
         if (cleaned) saved[key] = cleaned;
         else delete saved[key];
-        window.localStorage.setItem(storageKey, JSON.stringify(saved));
+        try { window.localStorage.setItem(storageKey, JSON.stringify(saved)); } catch (_) {}
         applyLabels();
       }
 

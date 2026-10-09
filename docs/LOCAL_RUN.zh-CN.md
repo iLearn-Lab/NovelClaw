@@ -24,9 +24,11 @@ http://127.0.0.1:8010/select-mode -> http://127.0.0.1:8012/dashboard
 这个脚本会自动：
 
 1. 停掉 `8010`、`8011`、`8012` 上旧的监听进程。
-2. 用安全默认值写入本地 `.env` 文件。
+2. 为缺失的配置创建 `.env` 文件，保留已有设置。
 3. 准备共享的 `.venv-shared`。
-4. 启动 `Portal`、`MultiAgent` 和 `NovelClaw`。
+4. 在后台启动 `Portal`、`MultiAgent` 和 `NovelClaw`，并检查服务就绪状态。
+
+服务日志位于各应用的 `local_web_portal/data/logs/` 目录。
 
 ## 一键停止
 
@@ -37,7 +39,7 @@ http://127.0.0.1:8010/select-mode -> http://127.0.0.1:8012/dashboard
 ## 手动启动
 
 ```powershell
-.\scripts\setup-local-env.ps1 -Overwrite
+.\scripts\setup-local-env.ps1
 .\scripts\bootstrap-shared-venv.ps1
 .\scripts\start-all-local.ps1 -UseSharedVenv
 ```

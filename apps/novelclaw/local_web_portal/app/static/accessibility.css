@@ -1,0 +1,88 @@
+/* Keyboard navigation and motion preferences shared by the writing surfaces. */
+.skip-link {
+  position: fixed;
+  inset: 12px auto auto 12px;
+  z-index: 10000;
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: #0f766e;
+  color: #fff;
+  font-weight: 700;
+  transform: translateY(-160%);
+}
+.skip-link:focus { transform: translateY(0); }
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid #0f766e;
+  outline-offset: 3px;
+}
+button:disabled { cursor: not-allowed; }
+.mobile-workspace-bar, .workspace-nav-overlay { display: none; }
+:where(.console-main, .ws-paper-body, .console-alert) { overflow-wrap: anywhere; }
+@media (max-width: 800px) {
+  body.console-body { padding: 0; }
+  .mobile-workspace-bar {
+    display: flex;
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: #131b35;
+    color: #fff;
+  }
+  .mobile-workspace-brand { color: inherit; font-weight: 800; font-size: 19px; text-decoration: none; }
+  .mobile-workspace-bar button {
+    min-height: 44px;
+    padding: 8px 16px;
+    border: 1px solid #626d90;
+    border-radius: 10px;
+    background: #222e50;
+    color: #fff;
+  }
+  body.console-body .console-shell { display: block; }
+  body.console-body .console-sidebar {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 60;
+    width: min(300px, 85vw);
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow-y: auto;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+  }
+  body.console-body.mobile-nav-open { overflow: hidden; }
+  body.console-body.mobile-nav-open .console-sidebar { transform: translateX(0); }
+  .mobile-nav-open .workspace-nav-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: rgb(9 15 32 / 55%);
+  }
+  body.console-body .console-main { width: 100%; margin: 0; padding: 16px; }
+  body.console-body .chat-mini-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  body.console-body .chat-side-panel--command { order: 2; }
+  body.console-body .chat-shell-grid--command { padding: 12px; gap: 16px; }
+  body.console-body .chat-hero-card--compact { padding: 20px; }
+  body.console-body .chat-board--thread { min-height: 260px; max-height: 55dvh; padding: 14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+@media (max-width: 640px) {
+  .ws-reader-toolbar, .ws-shell-head { flex-wrap: wrap; gap: 12px; }
+  .ws-reader-toolbar :where(button, a), .lang-btn { min-height: 44px; }
+}

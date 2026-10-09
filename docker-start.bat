@@ -1,4 +1,6 @@
 @echo off
+setlocal
+cd /d "%~dp0"
 REM Docker Quick Start Script for NovelClaw (Windows)
 
 echo ================================
@@ -38,6 +40,7 @@ echo Setting up environment files...
 
 if not exist "apps\auth-portal\.env" (
     copy .env.auth-portal.example apps\auth-portal\.env >nul
+    if errorlevel 1 goto :fail
     echo [OK] Created apps\auth-portal\.env
 ) else (
     echo [SKIP] apps\auth-portal\.env already exists
@@ -45,6 +48,7 @@ if not exist "apps\auth-portal\.env" (
 
 if not exist "apps\multiagent\.env" (
     copy .env.multiagent.example apps\multiagent\.env >nul
+    if errorlevel 1 goto :fail
     echo [OK] Created apps\multiagent\.env
 ) else (
     echo [SKIP] apps\multiagent\.env already exists
@@ -52,6 +56,7 @@ if not exist "apps\multiagent\.env" (
 
 if not exist "apps\novelclaw\.env" (
     copy .env.novelclaw.example apps\novelclaw\.env >nul
+    if errorlevel 1 goto :fail
     echo [OK] Created apps\novelclaw\.env
 ) else (
     echo [SKIP] apps\novelclaw\.env already exists
@@ -75,10 +80,12 @@ REM Build and start services
 echo.
 echo Building Docker images...
 %COMPOSE% build
+if errorlevel 1 goto :fail
 
 echo.
 echo Starting services...
 %COMPOSE% up -d
+if errorlevel 1 goto :fail
 
 echo.
 echo Waiting for services to start...
@@ -105,3 +112,8 @@ echo    Stop services:    %COMPOSE% down
 echo    Restart services: %COMPOSE% restart
 echo.
 pause
+exit /b 0
+
+:fail
+echo [ERROR] Deployment failed. Review the error above before retrying.
+exit /b 1

@@ -28,6 +28,8 @@ from agents.idea_copilot_agent import (
     load_state,
 )
 from .auth_bridge import sync_user_from_auth_db
+from utils.file_io import resolve_run_directory, tail_text
+
 from .db import SessionLocal, engine, get_db
 from .i18n import get_locale, install_i18n, set_locale, translate
 from .job_launcher import start_generation_job_process
@@ -303,23 +305,14 @@ def _workspace_payload(
 
 
 def _tail_text(path: Path, max_chars: int = 12000) -> str:
-    if not path.exists():
-        return ""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")[-max_chars:]
-        return ANSI_ESCAPE_RE.sub("", text)
-    except Exception:
-        return ""
+    return ANSI_ESCAPE_RE.sub("", tail_text(path, max_chars))
 
 
 def _resolve_run_dir(run_id: str) -> Path:
-    primary = RUNS_DIR / run_id
-    if primary.exists():
-        return primary
-    legacy = BASE_DIR / "runs" / run_id
-    if legacy.exists():
-        return legacy
-    return primary
+    try:
+        return resolve_run_directory(run_id, RUNS_DIR, BASE_DIR / "runs", BASE_DIR.parent / "runs")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
 
 
 def _memory_index_candidates(run_id: str = "") -> List[Path]:

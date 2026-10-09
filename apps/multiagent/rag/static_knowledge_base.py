@@ -4,8 +4,6 @@
 """
 from typing import Dict, List, Optional
 from rag.retriever import Retriever
-from rag.vector_store import VectorStore
-from rag.document_processor import DocumentProcessor
 from config import Config
 import os
 import json
@@ -15,6 +13,8 @@ class StaticKnowledgeBase:
     """外部静态知识库：存储大量小说和创意文本数据"""
     
     def __init__(self, config: Config):
+        from rag.vector_store import VectorStore
+        from rag.document_processor import DocumentProcessor
         self.config = config
         
         # 创建专门的外部知识库向量存储
