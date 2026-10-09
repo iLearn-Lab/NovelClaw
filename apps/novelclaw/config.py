@@ -110,7 +110,7 @@ class Config:
         
         # RAG 配置
         # 作为“基目录”使用；具体 collection 建议分开存储在子目录，避免单库损坏影响全局
-        self.vector_db_path: str = os.getenv("VECTOR_DB_PATH", "./vector_db")
+        self.vector_db_path: str = (os.getenv("VECTOR_DB_PATH", "").strip() or "./vector_db")
 
         # 各向量库子路径（隔离，降低 Chroma 索引损坏时的连带影响）
         self.memory_vector_db_path: str = os.getenv(

@@ -1,0 +1,6 @@
+-r apps/novelclaw/local_web_portal/requirements.txt
+openai>=1.0,<4
+httpx>=0.27,<1
+pytest>=8,<10
+ruff>=0.11,<1
+playwright>=1.51,<2

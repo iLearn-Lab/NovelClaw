@@ -8,3 +8,4 @@ bcrypt==4.0.1
 cryptography==45.0.7
 python-dotenv==1.1.1
 itsdangerous==2.2.0
+filelock>=3.13,<4

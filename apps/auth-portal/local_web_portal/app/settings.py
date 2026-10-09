@@ -8,10 +8,14 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BASE_DIR / "data"
-DATA_DIR.mkdir(parents=True, exist_ok=True)
 load_dotenv(BASE_DIR / ".env", override=False)
 load_dotenv(BASE_DIR.parent / ".env", override=False)
+
+DATA_DIR = Path(os.getenv("APP_DATA_DIR", "").strip() or BASE_DIR / "data").expanduser()
+if not DATA_DIR.is_absolute():
+    DATA_DIR = BASE_DIR.parent / DATA_DIR
+DATA_DIR = DATA_DIR.resolve()
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def env_or_default(name: str, default: str) -> str:

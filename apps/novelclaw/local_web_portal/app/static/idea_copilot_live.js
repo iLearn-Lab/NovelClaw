@@ -128,7 +128,8 @@
     if (!root) return;
     const form = root.querySelector('[data-idea-reply-form]');
     const feed = root.querySelector('[data-idea-feed]');
-    if (!form || !feed) return;
+    if (!form || !feed || root.dataset.replyInitialized) return;
+    root.dataset.replyInitialized = "true";
     const layout = root.dataset.layout || "dashboard";
     const sessionId = root.dataset.sessionId || "";
     const labels = {
@@ -148,9 +149,8 @@
     const textarea = form.querySelector('textarea[name="reply"]');
     const submitBtn = form.querySelector('button[type="submit"]');
     let polling = null;
-    let pollErrorCount = 0;
-    let recoveryRedirect = false;
-    let pollTicks = 0;
+    let busy = false;
+    let runRedirectPending = false;
 
     function scrollFeedToBottom() {
       if (!feed) return;
@@ -193,6 +193,8 @@
       if (!node) {
         node = document.createElement('div');
         node.setAttribute('data-idea-status', '1');
+        node.setAttribute('role', 'status');
+        node.setAttribute('aria-live', 'polite');
         node.className = 'console-alert';
         node.hidden = true;
         form.insertAdjacentElement('beforebegin', node);
@@ -224,22 +226,18 @@
     }
 
     function setBusy(isBusy) {
+      busy = isBusy;
+      form.setAttribute("aria-busy", String(isBusy));
       if (textarea) textarea.disabled = isBusy;
       if (submitBtn) submitBtn.disabled = isBusy;
-    }
-
-    function forceRefreshToSession() {
-      if (recoveryRedirect || !sessionId) return;
-      recoveryRedirect = true;
-      window.setTimeout(function () {
-        window.location.href = appPath(`/console/chat?session_id=${encodeURIComponent(sessionId)}`);
-      }, 350);
     }
 
     function refreshWorkspaceWhenRunStarts(payload) {
       if (!payload || payload.status === 'active' || !payload.final_job_id || !sessionId) {
         return false;
       }
+      if (runRedirectPending) return true;
+      runRedirectPending = true;
       setStatus('ok', labels.runStarted);
       window.setTimeout(function () {
         window.location.href = appPath(`/console/chat?session_id=${encodeURIComponent(sessionId)}`);
@@ -247,18 +245,22 @@
       return true;
     }
 
-    async function fetchState(animateLatest) {
+    async function fetchState(animateLatest, signal) {
       const baseUrl = appPath(`/api/idea-copilot/${sessionId}/state`);
       const sep = baseUrl.includes('?') ? '&' : '?';
       const response = await fetch(`${baseUrl}${sep}_=${Date.now()}`, {
         headers: { Accept: 'application/json' },
         cache: 'no-store',
+        signal,
       });
       const payload = await readPayload(response);
       if (!response.ok || !payload.ok) {
         throw new Error(normalizeError(payload, 'Failed to load state'));
       }
       if (!payload.reply_pending && payload.reply_error) {
+        if (polling) polling.stop();
+        setStatus('error', payload.reply_error);
+        setBusy(false);
         throw new Error(normalizeError(payload.reply_error, 'Reply failed'));
       }
       updateSummary(root, payload);
@@ -277,59 +279,38 @@
 
     function startPolling(options) {
       const forceUntilAssistant = !!(options && options.forceUntilAssistant);
-      if (polling) window.clearInterval(polling);
-      pollTicks = 0;
-      polling = window.setInterval(async function () {
-        try {
-          pollTicks += 1;
-          const payload = await fetchState(false);
-          pollErrorCount = 0;
-          if (!payload.reply_pending) {
-            const messages = Array.isArray(payload.messages) ? payload.messages : [];
-            const latestRole = messages.length ? String(messages[messages.length - 1].role || '') : '';
-            const waitForAssistant = forceUntilAssistant && !payload.final_job_id && latestRole === 'user';
-            if (waitForAssistant) {
-              const syncingText = pollTicks >= 20
-                ? `${labels.continuing} ${document.documentElement.lang.toLowerCase().startsWith('zh') ? '回复已生成，正在同步到当前工作台…' : 'The reply is still syncing into this workspace...'}`
-                : labels.continuing;
-              setStatus('ok', syncingText);
-              ensurePendingVisual();
-              return;
-            }
-            window.clearInterval(polling);
-            polling = null;
-            renderMessages(feed, payload.messages, layout, labels, true);
-            scrollFeedToBottom();
-            if (payload.latest_turn && payload.latest_turn.role === 'assistant') {
-              animateAssistant(feed, payload.latest_turn);
-            }
-            setStatus('ok', '');
-            setBusy(false);
-            if (refreshWorkspaceWhenRunStarts(payload)) {
-              return;
-            }
-          }
-        } catch (error) {
-          pollErrorCount += 1;
-          if (pollErrorCount <= 8) {
-            setStatus('ok', `${labels.continuing} ${document.documentElement.lang.toLowerCase().startsWith('zh') ? '正在重连实时状态…' : 'Reconnecting live state...'}`);
-            return;
-          }
-          if (pollErrorCount <= 16) {
-            setStatus('ok', document.documentElement.lang.toLowerCase().startsWith('zh') ? '状态同步异常，正在强制刷新当前工作台…' : 'State sync is unstable. Refreshing the workspace...');
-            forceRefreshToSession();
-            return;
-          }
-          window.clearInterval(polling);
-          polling = null;
-          setStatus('error', error);
-          setBusy(false);
+      if (polling) polling.stop();
+      polling = window.NovelClawLive.poll(async (signal) => {
+        const payload = await fetchState(false, signal);
+        if (payload.reply_pending) return true;
+        const messages = Array.isArray(payload.messages) ? payload.messages : [];
+        const latestRole = messages.length ? String(messages[messages.length - 1].role || '') : '';
+        if (forceUntilAssistant && !payload.final_job_id && latestRole === 'user') {
+          setStatus('ok', labels.continuing);
+          ensurePendingVisual();
+          return true;
         }
-      }, 900);
+        renderMessages(feed, payload.messages, layout, labels, true);
+        scrollFeedToBottom();
+        if (payload.latest_turn && payload.latest_turn.role === 'assistant') animateAssistant(feed, payload.latest_turn);
+        setStatus('ok', '');
+        setBusy(false);
+        refreshWorkspaceWhenRunStarts(payload);
+        return false;
+      }, {
+        interval: 1500,
+        onError(error, failures) {
+          const isZh = document.documentElement.lang.toLowerCase().startsWith('zh');
+          setStatus('error', failures < 4
+            ? (isZh ? '连接中断，正在重试…' : 'Connection interrupted. Retrying...')
+            : error);
+        },
+      });
     }
 
     form.addEventListener('submit', async function (event) {
       event.preventDefault();
+      if (busy) return;
       const reply = textarea ? String(textarea.value || '').trim() : '';
       if (!reply) {
         setStatus('error', 'Reply cannot be empty');
@@ -375,6 +356,7 @@
       } catch (error) {
         feed.querySelector('[data-pending-row="1"]')?.remove();
         feed.querySelector('[data-optimistic-user="1"]')?.remove();
+        if (textarea && !textarea.value) { textarea.value = reply; textarea.dispatchEvent(new Event('input')); }
         setStatus('error', error);
         setBusy(false);
       }

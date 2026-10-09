@@ -33,6 +33,11 @@ desktop.ini
 # Local data and runtime
 apps/*/local_web_portal/data/
 apps/*/local_web_portal/runs/
+apps/*/vector_db/
+apps/*/runs/
+test-results/
+.pytest_cache/
+.ruff_cache/
 state_snapshots/
 *.db
 *.db-journal
@@ -41,7 +46,9 @@ state_snapshots/
 # Environment files (will be mounted as volumes)
 .env
 *.env
+.env.*
 !*.env.example
+!.env.*.example
 
 # Documentation
 *.md

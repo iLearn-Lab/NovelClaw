@@ -415,10 +415,10 @@
       }
     }
 
-    async function pollChapters() {
+    async function pollChapters(signal) {
       try {
-        const resp = await fetch(appPath(`/jobs/${jobId}/chapters`), { cache: "no-store" });
-        if (!resp.ok) return;
+        const resp = await fetch(appPath(`/jobs/${jobId}/chapters`), { cache: "no-store", signal });
+        if (!resp.ok) throw new Error("Live status unavailable");
         const data = await resp.json();
         renderChapters(data.chapters || []);
       } catch (err) {
@@ -491,21 +491,21 @@
     let chapterCheckpointRunId = '{{ job.run_id if job.run_id else "" }}';
     let checkpointPolling = false;
 
-    async function pollCheckpoint() {
+    async function pollCheckpoint(signal) {
       if (!chapterCheckpointRunId || checkpointPolling || checkpointVisible) return;
       checkpointPolling = true;
       try {
-        const r = await fetch(appPath(`/api/runs/${chapterCheckpointRunId}/chapter-complete`), { cache: 'no-store' });
+        const r = await fetch(appPath(`/api/runs/${chapterCheckpointRunId}/chapter-complete`), { cache: 'no-store', signal });
         const d = await r.json();
         if (d.pending) renderCheckpointJd(d, chapterCheckpointRunId);
       } catch (_) {}
       checkpointPolling = false;
     }
 
-    async function pollLogs() {
+    async function pollLogs(signal) {
       try {
-        const resp = await fetch(appPath(`/jobs/${jobId}/logs`), { cache: "no-store" });
-        if (!resp.ok) return;
+        const resp = await fetch(appPath(`/jobs/${jobId}/logs`), { cache: "no-store", signal });
+        if (!resp.ok) throw new Error("Live status unavailable");
         const data = await resp.json();
 
         updateLogBox(workerBox, data.worker_log, ui.no_worker_log);
@@ -516,18 +516,18 @@
           renderSnapshot(data.progress_snapshot);
         }
         if (data.run_id) chapterCheckpointRunId = data.run_id;
-        await pollChapters();
-        await pollCheckpoint();
+        await pollChapters(signal);
+        await pollCheckpoint(signal);
 
         if (["succeeded", "failed", "canceled"].includes(data.status)) {
           jdIsLive = false;
           setTimeout(() => window.location.reload(), 1000);
-          return;
+          return false;
         }
       } catch (err) {
-        // ignore transient polling errors
+        throw err;
       }
-      setTimeout(pollLogs, 2000);
+      return true;
     }
 
     renderSnapshot({{ snapshot|tojson }});
@@ -536,7 +536,7 @@
     renderTrace({{ progress_log_text|tojson }});
 
     if (["queued", "running"].includes("{{ job.status }}")) {
-      pollLogs();
+      window.NovelClawLive.poll(pollLogs, { interval: 2000 });
     }
   })();
 </script>

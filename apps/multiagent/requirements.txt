@@ -5,5 +5,6 @@ chromadb>=0.4.0
 numpy>=1.24.0
 pydantic>=2.0.0
 python-dotenv>=1.0.0
+filelock>=3.13,<4
 tiktoken>=0.5.0
 datasets>=2.14.0

@@ -7,6 +7,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -111,8 +112,12 @@ def _ensure_preview_user(request: Request, db: Session) -> User:
     if user is None:
         user = User(email=email, password_hash="preview-mode")
         db.add(user)
-        db.commit()
-        db.refresh(user)
+        try:
+            db.commit()
+            db.refresh(user)
+        except IntegrityError:
+            db.rollback()
+            user = db.execute(select(User).where(User.email == email)).scalar_one()
     request.session["uid"] = user.id
     return user
 

@@ -2,8 +2,6 @@
 检索器模块：整合向量数据库和文档处理
 """
 from typing import List, Dict, Optional
-from rag.vector_store import VectorStore
-from rag.document_processor import DocumentProcessor
 from config import Config
 
 
@@ -11,6 +9,8 @@ class Retriever:
     """RAG 检索器"""
     
     def __init__(self, config: Config, collection_name: str = "documents"):
+        from rag.vector_store import VectorStore
+        from rag.document_processor import DocumentProcessor
         self.config = config
         db_path = getattr(config, "knowledge_vector_db_path", None) or config.vector_db_path
         self.vector_store = VectorStore(config, collection_name, db_path=db_path)
@@ -94,6 +94,7 @@ class Retriever:
         return "\n".join(context_parts)
     
     def clear_knowledge_base(self):
+        from rag.vector_store import VectorStore
         """清空知识库"""
         self.vector_store.delete_collection()
         db_path = getattr(self.config, "knowledge_vector_db_path", None) or self.config.vector_db_path

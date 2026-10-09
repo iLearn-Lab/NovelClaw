@@ -8,9 +8,8 @@ import shutil
 import threading
 import zipfile
 from datetime import datetime, timedelta, timezone
-from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import quote_plus, urlsplit, urlunsplit
 
 from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, status
@@ -18,6 +17,7 @@ from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, Red
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -25,6 +25,8 @@ from config import Config
 from rag.memory_system import MemorySystem
 from utils.language_detector import detect_language
 from utils.llm_client import LLMClient
+from utils.file_io import atomic_write_text, resolve_run_directory, tail_text
+from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index
 
 from agents.idea_copilot_agent import (
     IdeaCopilotAgent,
@@ -625,23 +627,14 @@ def healthz():
 
 
 def _tail_text(path: Path, max_chars: int = 12000) -> str:
-    if not path.exists():
-        return ""
-    try:
-        text = path.read_text(encoding="utf-8", errors="replace")[-max_chars:]
-        return ANSI_ESCAPE_RE.sub("", text)
-    except Exception:
-        return ""
+    return ANSI_ESCAPE_RE.sub("", tail_text(path, max_chars))
 
 
 def _resolve_run_dir(run_id: str) -> Path:
-    primary = RUNS_DIR / run_id
-    if primary.exists():
-        return primary
-    legacy = BASE_DIR / "runs" / run_id
-    if legacy.exists():
-        return legacy
-    return primary
+    try:
+        return resolve_run_directory(run_id, RUNS_DIR, BASE_DIR / "runs", BASE_DIR.parent / "runs")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail="Run not found") from exc
 
 
 def _capability_preferences_for_user(db: Session, user_id: int) -> Dict[str, CapabilityPreference]:
@@ -806,9 +799,12 @@ def _memory_index_candidates(run_id: str) -> List[Path]:
     clean_run_id = str(run_id or "").strip()
     if not clean_run_id:
         return []
-    return [
-        (base_root / "vector_db" / "memory" / f"run_{clean_run_id}" / "memory_index.json").resolve(),
-    ]
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,127}", clean_run_id):
+        return []
+    vector_root = Path(os.getenv("VECTOR_DB_PATH", "").strip() or base_root / "vector_db").expanduser()
+    if not vector_root.is_absolute():
+        vector_root = base_root / vector_root
+    return [(vector_root / "memory" / f"run_{clean_run_id}" / "memory_index.json").resolve()]
 
 
 def _load_memory_index_for_run(run_id: str) -> Dict:
@@ -852,23 +848,22 @@ def _ensure_memory_index_shape(index: Dict) -> Dict:
     return value
 
 
-def _load_editable_memory_index_for_run(run_id: str) -> Dict:
-    loaded = _load_memory_index_for_run(run_id)
-    if not loaded:
-        return _empty_memory_index()
+def _load_editable_memory_index_for_run(run_id: str) -> MemoryIndex:
+    path_value = _memory_index_path_for_run(run_id)
+    if not path_value:
+        raise HTTPException(status_code=404, detail="Run not found")
+    try:
+        loaded = load_memory_index(Path(path_value))
+    except (OSError, ValueError) as exc:
+        raise HTTPException(status_code=409, detail="Memory index could not be read; existing data has been preserved") from exc
     return _ensure_memory_index_shape(loaded)
 
 
-def _save_memory_index_for_run(run_id: str, index: Dict) -> None:
+def _save_memory_index_for_run(run_id: str, index: MemoryIndex) -> None:
     path_value = _memory_index_path_for_run(run_id)
     if not path_value:
         raise ValueError("Memory index path is unavailable")
-    path = Path(path_value)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(_ensure_memory_index_shape(index), ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    save_memory_index(Path(path_value), index)
 
 
 def _job_for_run_id(db: Session, user_id: int, run_id: str) -> Optional[GenerationJob]:
@@ -903,8 +898,8 @@ def _memory_topic_hint(index: Dict, fallback: str = "global") -> str:
     return fallback
 
 
-@lru_cache(maxsize=1)
 def _portal_memory_system() -> MemorySystem:
+    # Each writer owns a snapshot; saves merge with other writers under a file lock.
     cfg = Config(require_api_key=False)
     cfg.language = settings.ui_language if settings.ui_language in {"en", "zh"} else "en"
     cfg.memory_only_mode = True
@@ -2720,7 +2715,7 @@ def _require_agent_token(
             detail="Agent API is disabled. Set APP_AGENT_API_KEY to enable /api/v1 endpoints.",
         )
     supplied = str(x_api_key or "").strip() or _extract_bearer_token(authorization)
-    if not supplied or not secrets.compare_digest(supplied, expected):
+    if not supplied or not secrets.compare_digest(supplied.encode("utf-8"), expected.encode("utf-8")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid agent API key")
 
 
@@ -2731,8 +2726,12 @@ def _agent_user(db: Session) -> User:
         return user
     user = User(email=email, password_hash="agent-api")
     db.add(user)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except IntegrityError:
+        db.rollback()
+        user = db.execute(select(User).where(User.email == email)).scalar_one()
     return user
 
 
@@ -4159,9 +4158,13 @@ async def save_env_settings(
         if key not in written_keys:
             existing_lines.append(f"{key}={value}")
     try:
-        env_path.write_text("\n".join(existing_lines) + "\n", encoding="utf-8")
-    except Exception:
-        pass
+        atomic_write_text(env_path, "\n".join(existing_lines) + "\n", encoding="utf-8")
+    except OSError:
+        return _redirect_with_notice("/console/env", error=_ui_text(
+            language,
+            "配置未保存：配置文件不可写。请检查目录权限或容器挂载设置。",
+            "Settings were not saved. Check directory permissions or container mounts.",
+        ))
 
     # Update os.environ so the current process picks up new values immediately
     for key, value in new_env.items():
@@ -4561,7 +4564,7 @@ async def idea_copilot_brief_edit(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
     try:
-        body = await request.json()
+        body = await _json_payload(request)
         new_brief = str(body.get("brief", "")).strip()
     except Exception:
         form = await request.form()
@@ -5035,7 +5038,7 @@ async def api_add_memory_bank_entry(run_id: str, bank: str, request: Request, db
     if not _job_for_run_id(db, user.id, run_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
-    body = await request.json()
+    body = await _json_payload(request)
     content = str(body.get("content") or "").strip()
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Content cannot be empty")
@@ -5048,7 +5051,7 @@ async def api_add_memory_bank_entry(run_id: str, bank: str, request: Request, db
     source = str(body.get("source") or metadata.get("source") or "manual_workspace").strip() or "manual_workspace"
     timestamp = datetime.now().isoformat()
     entry = {
-        "id": f"manual_{bank}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(index['claw'].get(bank, []))}",
+        "id": f"manual_{bank}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{secrets.token_hex(6)}",
         "bank": bank,
         "topic": topic,
         "content": content,
@@ -5087,7 +5090,7 @@ async def api_update_memory_bank_entry(run_id: str, bank: str, entry_id: str, re
     if not _job_for_run_id(db, user.id, run_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
-    body = await request.json()
+    body = await _json_payload(request)
     content = str(body.get("content") or "").strip()
     if not content:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Content cannot be empty")
@@ -5131,7 +5134,7 @@ async def api_update_chapter_content(run_id: str, chapter_no: int, request: Requ
     if not _job_for_run_id(db, user.id, run_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
-    body = await request.json()
+    body = await _json_payload(request)
     content_raw = body.get("content")
     content = str(content_raw if content_raw is not None else "")
     if not content.strip():
@@ -5143,7 +5146,15 @@ async def api_update_chapter_content(run_id: str, chapter_no: int, request: Requ
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter output not found")
 
     normalized = content.rstrip() + "\n"
-    chapter_path.write_text(normalized, encoding="utf-8")
+    if "base_content" in body:
+        current_content = chapter_path.read_text(encoding="utf-8")
+        if current_content.strip() != str(body["base_content"]).strip():
+            raise HTTPException(status_code=409, detail=_ui_text(
+                _ui_language(request),
+                "章节已被更新。请保留当前修改，刷新后合并内容。",
+                "This chapter has changed. Keep your edits, then refresh and merge them.",
+            ))
+    atomic_write_text(chapter_path, normalized)
     lines = [line.strip() for line in normalized.splitlines() if line.strip()]
     title = lines[0] if lines else chapter_path.name
     return JSONResponse(
@@ -5169,7 +5180,7 @@ async def api_update_outline_asset(run_id: str, outline_id: str, request: Reques
     if not _job_for_run_id(db, user.id, run_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
-    body = await request.json()
+    body = await _json_payload(request)
     content_raw = body.get("content")
     content = str(content_raw if content_raw is not None else "")
     if not content.strip():
@@ -5237,14 +5248,14 @@ async def api_submit_answer(run_id: str, request: Request, db: Session = Depends
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
     if not _job_for_run_id(db, user.id, run_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
-    body = await request.json()
+    body = await _json_payload(request)
     answer = str(body.get("answer") or "").strip()
     if not answer:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Answer cannot be empty")
     run_dir = _resolve_run_dir(run_id)
     run_dir.mkdir(parents=True, exist_ok=True)
     reply_path = run_dir / "claw_reply.json"
-    reply_path.write_text(
+    atomic_write_text(reply_path,
         json.dumps({"answer": answer, "ts": __import__("time").time()}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -5259,7 +5270,7 @@ async def api_interrupt_run(run_id: str, request: Request, db: Session = Depends
     if not _job_for_run_id(db, user.id, run_id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
 
-    body = await request.json()
+    body = await _json_payload(request)
     message = str(body.get("message") or "").strip()
     if not message:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message cannot be empty")
@@ -5285,7 +5296,7 @@ async def api_interrupt_run(run_id: str, request: Request, db: Session = Depends
             payload = {"messages": []}
 
     payload["messages"].append({"message": message, "ts": __import__("time").time()})
-    interrupt_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    atomic_write_text(interrupt_path, json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     return JSONResponse({"ok": True, "queued": len(payload["messages"])})
 
 
@@ -5318,7 +5329,7 @@ async def api_chapter_message(run_id: str, request: Request, db: Session = Depen
     user = _current_user(request, db)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
-    body = await request.json()
+    body = await _json_payload(request)
     message = str(body.get("message") or "").strip()
     raw_updates = body.get("memory_updates") if isinstance(body.get("memory_updates"), list) else []
     memory_updates: List[Dict[str, object]] = []
@@ -5342,7 +5353,7 @@ async def api_chapter_message(run_id: str, request: Request, db: Session = Depen
     run_dir.mkdir(parents=True, exist_ok=True)
     # Write instruction for the worker
     if message or memory_updates:
-        (run_dir / "claw_chapter_msg.json").write_text(
+        atomic_write_text(run_dir / "claw_chapter_msg.json",
             json.dumps({"message": message, "memory_updates": memory_updates, "ts": __import__("time").time()}, ensure_ascii=False),
             encoding="utf-8",
         )

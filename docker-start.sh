@@ -3,6 +3,7 @@
 # Docker quick start script for NovelClaw.
 
 set -euo pipefail
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 echo "NovelClaw Docker Deployment Setup"
 echo "================================="
@@ -56,9 +57,9 @@ echo ""
 echo "Creating data directories..."
 mkdir -p apps/auth-portal/local_web_portal/data
 mkdir -p apps/multiagent/local_web_portal/data
-mkdir -p apps/multiagent/local_web_portal/runs
+mkdir -p apps/multiagent/local_web_portal/runs apps/multiagent/vector_db
 mkdir -p apps/novelclaw/local_web_portal/data
-mkdir -p apps/novelclaw/local_web_portal/runs
+mkdir -p apps/novelclaw/local_web_portal/runs apps/novelclaw/vector_db
 echo "[OK] Data directories created"
 
 echo ""

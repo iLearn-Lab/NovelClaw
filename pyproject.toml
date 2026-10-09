@@ -1,0 +1,16 @@
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = [
+  "ignore:.*on_event is deprecated.*:DeprecationWarning",
+  "ignore:.*The `name` is not the first parameter anymore.*:DeprecationWarning",
+  "ignore:'crypt' is deprecated.*:DeprecationWarning",
+]
+
+[tool.ruff]
+target-version = "py310"
+extend-exclude = [".venv-shared"]
+
+[tool.ruff.lint]
+# Catch runtime mistakes without reformatting the legacy application.
+select = ["E9", "F63", "F7", "F82"]

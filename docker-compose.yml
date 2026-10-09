@@ -1,5 +1,3 @@
-version: '3.8'
-
 x-shared-app-env: &shared-app-env
   APP_SESSION_SECRET: ${APP_SESSION_SECRET:-novelclaw-local-docker-session-secret-change-me}
   APP_SESSION_COOKIE_NAME: ${APP_SESSION_COOKIE_NAME:-novelclaw_session}
@@ -7,6 +5,8 @@ x-shared-app-env: &shared-app-env
 services:
   auth-portal:
     build: .
+    image: novelclaw:local
+    init: true
     container_name: novelclaw-auth-portal
     working_dir: /app/apps/auth-portal
     command: python -m uvicorn local_web_portal.app.main:app --host 0.0.0.0 --port 8010
@@ -33,6 +33,11 @@ services:
 
   multiagent:
     build: .
+    image: novelclaw:local
+    init: true
+    depends_on:
+      auth-portal:
+        condition: service_healthy
     container_name: novelclaw-multiagent
     working_dir: /app/apps/multiagent
     command: python -m uvicorn local_web_portal.app.main:app --host 0.0.0.0 --port 8011
@@ -41,6 +46,7 @@ services:
     volumes:
       - ./apps/multiagent/local_web_portal/data:/app/apps/multiagent/local_web_portal/data
       - ./apps/multiagent/local_web_portal/runs:/app/apps/multiagent/local_web_portal/runs
+      - ./apps/multiagent/vector_db:/app/apps/multiagent/vector_db
       - ./apps/auth-portal/local_web_portal/data:/app/apps/auth-portal/local_web_portal/data
       - ./apps/multiagent/.env:/app/apps/multiagent/.env:ro
     environment:
@@ -60,6 +66,11 @@ services:
 
   novelclaw:
     build: .
+    image: novelclaw:local
+    init: true
+    depends_on:
+      auth-portal:
+        condition: service_healthy
     container_name: novelclaw-workspace
     working_dir: /app/apps/novelclaw
     command: python -m uvicorn local_web_portal.app.main:app --host 0.0.0.0 --port 8012
@@ -68,6 +79,7 @@ services:
     volumes:
       - ./apps/novelclaw/local_web_portal/data:/app/apps/novelclaw/local_web_portal/data
       - ./apps/novelclaw/local_web_portal/runs:/app/apps/novelclaw/local_web_portal/runs
+      - ./apps/novelclaw/vector_db:/app/apps/novelclaw/vector_db
       - ./apps/auth-portal/local_web_portal/data:/app/apps/auth-portal/local_web_portal/data
       - ./apps/novelclaw/.env:/app/apps/novelclaw/.env:ro
     environment:

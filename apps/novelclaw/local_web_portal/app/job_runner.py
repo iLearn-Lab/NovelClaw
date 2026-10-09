@@ -2,17 +2,16 @@ from __future__ import annotations
 
 import json
 import os
-import queue
-import subprocess
 import sys
-import threading
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session
+
+from utils.file_io import atomic_write_text, tail_text
+from utils.processes import run_logged_process
 
 from .db import SessionLocal
 from .models import ApiCredential, CapabilityPreference, GenerationJob, IdeaCopilotSession, ProviderConfig
@@ -42,29 +41,6 @@ def _is_cancel_requested(run_id: str) -> bool:
         return _cancel_flag_path(run_id).exists()
     except Exception:
         return False
-
-
-def _stdout_reader(pipe, out_queue: "queue.Queue[Optional[str]]") -> None:
-    try:
-        if pipe is None:
-            return
-        for line in iter(pipe.readline, ""):
-            out_queue.put(line)
-    finally:
-        out_queue.put(None)
-
-
-def _append_worker_log(path: Path, text: str) -> None:
-    value = str(text or "")
-    if not value:
-        return
-    payload = value.replace("\x00", "").rstrip("\r\n") + "\n"
-    try:
-        with path.open("ab") as fp:
-            fp.write(payload.encode("utf-8", errors="replace"))
-            fp.flush()
-    except OSError as exc:
-        print(f"[worker-log] append failed path={path} error={exc}")
 
 
 def _job_status_is_running(db: Session, job_id: int) -> bool:
@@ -275,7 +251,7 @@ def _save_job_artifacts(run_id: str, result: dict) -> tuple[str, str]:
         "",
         final_text,
     ]
-    output_path.write_text("\n".join(header_lines), encoding="utf-8")
+    atomic_write_text(output_path, "\n".join(header_lines), encoding="utf-8")
 
     metadata = {
         "run_id": run_id,
@@ -290,9 +266,9 @@ def _save_job_artifacts(run_id: str, result: dict) -> tuple[str, str]:
         "consistency": result.get("consistency", {}),
         "created_at": datetime.now().isoformat(),
     }
-    metadata_path.write_text(json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
-    result_json_path.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
-    round_results_path.write_text(
+    atomic_write_text(metadata_path, json.dumps(metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_text(result_json_path, json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_text(round_results_path,
         json.dumps(result.get("round_results", []), ensure_ascii=False, indent=2),
         encoding="utf-8",
     )
@@ -300,12 +276,7 @@ def _save_job_artifacts(run_id: str, result: dict) -> tuple[str, str]:
 
 
 def _tail_text(path: Path, max_chars: int = 4000) -> str:
-    if not path.exists():
-        return ""
-    try:
-        return path.read_text(encoding="utf-8", errors="replace")[-max_chars:]
-    except Exception:
-        return ""
+    return tail_text(path, max_chars)
 
 
 def _run_worker_subprocess(
@@ -323,12 +294,6 @@ def _run_worker_subprocess(
     worker_out = RUNS_DIR / run_id / "worker_result.json"
     worker_out.parent.mkdir(parents=True, exist_ok=True)
     worker_log = RUNS_DIR / run_id / "worker.log"
-    cancel_flag = _cancel_flag_path(run_id)
-    try:
-        if cancel_flag.exists():
-            cancel_flag.unlink()
-    except Exception:
-        pass
 
     cmd = [
         sys.executable,
@@ -355,75 +320,13 @@ def _run_worker_subprocess(
     )
     env["RUN_ID"] = run_id
 
-    process = subprocess.Popen(
-        cmd,
-        cwd=str(BASE_DIR.parent),
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
+    return_code = run_logged_process(
+        cmd, cwd=BASE_DIR.parent, env=env, log_path=worker_log,
+        cancel_requested=lambda: _is_cancel_requested(run_id),
+        is_running=is_running_check,
+        timeout=settings.job_timeout_seconds,
+        idle_timeout=settings.job_idle_timeout_seconds,
     )
-    started = time.monotonic()
-    last_output_at = started
-    line_queue: "queue.Queue[Optional[str]]" = queue.Queue()
-    reader = threading.Thread(target=_stdout_reader, args=(process.stdout, line_queue), daemon=True)
-    reader.start()
-    stdout_closed = False
-
-    _append_worker_log(worker_log, f"[system] worker started pid={process.pid} run_id={run_id}")
-
-    while True:
-        line: Optional[str]
-        try:
-            line = line_queue.get(timeout=0.2)
-        except queue.Empty:
-            line = ""
-
-        if line is None:
-            stdout_closed = True
-        elif line:
-            clean = line.rstrip("\n")
-            if clean:
-                last_output_at = time.monotonic()
-                _append_worker_log(worker_log, clean)
-                print(f"[worker][job:{run_id}] {clean}")
-
-        if is_running_check and not is_running_check():
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-            _append_worker_log(worker_log, "[system] worker terminated because job is no longer running.")
-            raise RuntimeError(_txt(language, "Job canceled while worker was running.", "Job canceled while worker was running."))
-
-        if _is_cancel_requested(run_id):
-            process.terminate()
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                process.kill()
-            _append_worker_log(worker_log, "[system] worker terminated by cancel flag.")
-            raise RuntimeError(_txt(language, "Job canceled while worker was running.", "Job canceled while worker was running."))
-
-        now = time.monotonic()
-        if settings.job_timeout_seconds > 0 and now - started > settings.job_timeout_seconds:
-            process.kill()
-            _append_worker_log(worker_log, "[system] worker killed due to timeout.")
-            raise TimeoutError(_txt(language, f"Worker exceeded timeout: {settings.job_timeout_seconds}s", f"Worker exceeded timeout: {settings.job_timeout_seconds}s"))
-
-        if settings.job_idle_timeout_seconds > 0 and now - last_output_at > settings.job_idle_timeout_seconds:
-            process.kill()
-            _append_worker_log(worker_log, "[system] worker killed due to idle timeout.")
-            raise TimeoutError(_txt(language, f"Worker exceeded idle timeout: {settings.job_idle_timeout_seconds}s", f"Worker exceeded idle timeout: {settings.job_idle_timeout_seconds}s"))
-
-        if process.poll() is not None and (stdout_closed or line_queue.empty()):
-            break
-
-    return_code = process.wait()
 
     if not worker_out.exists():
         raise RuntimeError(
@@ -442,13 +345,16 @@ def _run_worker_subprocess(
 def run_generation_job(job_id: int) -> None:
     db = SessionLocal()
     try:
-        job = db.get(GenerationJob, job_id)
-        if not job:
-            return
-
-        job.status = "running"
-        job.updated_at = _utcnow()
+        # Claim once in the database, including when two requests start together.
+        claimed = db.execute(
+            update(GenerationJob)
+            .where(GenerationJob.id == job_id, GenerationJob.status == "queued")
+            .values(status="running", updated_at=_utcnow())
+        ).rowcount
         db.commit()
+        if not claimed:
+            return
+        job = db.get(GenerationJob, job_id)
 
         preferred_language, source_language, translation_mode = _job_language_profile(db, job_id)
 
@@ -480,13 +386,14 @@ def run_generation_job(job_id: int) -> None:
             language=preferred_language,
             source_language=source_language,
             translation_mode=translation_mode,
+            enabled_capabilities=_enabled_capabilities_for_user(db, job.user_id),
             is_running_check=lambda: _job_status_is_running(db, job_id),
         )
 
         if not _job_status_is_running(db, job_id):
             return
 
-        if not worker_payload.get("ok"):
+        if not worker_payload.get("ok") or worker_payload.get("_returncode", 0) != 0:
             worker_error = worker_payload.get("error", _txt(preferred_language, "未知的工作进程错误。", "Unknown worker error."))
             worker_tb = worker_payload.get("traceback", "")
             worker_stderr = worker_payload.get("_stderr", "")
@@ -497,13 +404,14 @@ def run_generation_job(job_id: int) -> None:
         result = worker_payload.get("result", {})
         output_path, excerpt = _save_job_artifacts(run_id, result)
 
-        job.status = "succeeded"
-        job.run_id = run_id
-        job.output_path = output_path
-        job.result_excerpt = excerpt
-        job.error_message = ""
-        job.finished_at = _utcnow()
-        job.updated_at = _utcnow()
+        # Cancellation wins even if it arrives while artifacts are being saved.
+        db.execute(
+            update(GenerationJob)
+            .where(GenerationJob.id == job_id, GenerationJob.status == "running")
+            .values(status="succeeded", run_id=run_id, output_path=output_path,
+                    result_excerpt=excerpt, error_message="", finished_at=_utcnow(),
+                    updated_at=_utcnow())
+        )
         db.commit()
     except Exception as exc:
         try:
@@ -517,10 +425,12 @@ def run_generation_job(job_id: int) -> None:
                     run_dir = RUNS_DIR / job.run_id
                     run_dir.mkdir(parents=True, exist_ok=True)
                     (run_dir / "error.txt").write_text(str(exc), encoding="utf-8")
-                job.status = "failed"
-                job.error_message = str(exc)[:4000]
-                job.finished_at = _utcnow()
-                job.updated_at = _utcnow()
+                db.execute(
+                    update(GenerationJob)
+                    .where(GenerationJob.id == job_id, GenerationJob.status == "running")
+                    .values(status="failed", error_message=str(exc)[:4000],
+                            finished_at=_utcnow(), updated_at=_utcnow())
+                )
                 db.commit()
         except Exception as db_exc:
             fallback_dir = RUNS_DIR / f"job_{job_id}_db_failure"

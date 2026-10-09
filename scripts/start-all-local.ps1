@@ -42,12 +42,12 @@ function Ensure-CoreModules {
     [string[]]$RequirementFiles
   )
 
-  $installed = (& $PythonExe -m pip list --format=freeze 2>$null | Out-String)
-  if (
-    $installed -match "(?m)^uvicorn==" -and
-    $installed -match "(?m)^fastapi==" -and
-    $installed -match "(?m)^sqlalchemy=="
-  ) {
+  $modules = @("uvicorn", "fastapi", "sqlalchemy", "jinja2", "multipart", "itsdangerous", "dotenv")
+  if ((Split-Path $Workdir -Leaf) -ne "auth-portal") {
+    $modules += @("openai", "cryptography", "passlib", "filelock")
+  }
+  & $PythonExe -c "import importlib.util, sys; sys.exit(not all(importlib.util.find_spec(name) for name in sys.argv[1:]))" @modules
+  if ($LASTEXITCODE -eq 0) {
     return
   }
 
@@ -57,6 +57,7 @@ function Ensure-CoreModules {
     & $PythonExe -m pip install --upgrade pip setuptools wheel
     foreach ($req in $RequirementFiles) {
       & $PythonExe -m pip install -r $req
+      if ($LASTEXITCODE -ne 0) { throw "Dependency installation failed: $req" }
     }
   } finally {
     Pop-Location
@@ -132,9 +133,21 @@ foreach ($svc in $services) {
     }
   }
 
-  $command = "Set-Location '$($svc.Workdir)'; & '$pythonExe' $($svc.Args)"
-  Start-Process powershell -WorkingDirectory $svc.Workdir -ArgumentList "-NoExit", "-Command", $command | Out-Null
-  Write-Host "[started] $($svc.Name)"
+  $logDir = Join-Path $svc.Workdir "local_web_portal\data\logs"
+  New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+  $process = Start-Process -FilePath $pythonExe -WorkingDirectory $svc.Workdir -ArgumentList $svc.Args -WindowStyle Hidden -RedirectStandardOutput (Join-Path $logDir "server.log") -RedirectStandardError (Join-Path $logDir "server-error.log") -PassThru
+  $ready = $false
+  $deadline = (Get-Date).AddSeconds(25)
+  while ((Get-Date) -lt $deadline) {
+    $process.Refresh()
+    if ($process.HasExited) { throw "$($svc.Name) exited. See $logDir\server-error.log" }
+    try {
+      $health = Invoke-RestMethod -Uri "http://127.0.0.1:$($svc.Port)/healthz" -TimeoutSec 2
+      if ($health.ok) { $ready = $true; break }
+    } catch { Start-Sleep -Milliseconds 250 }
+  }
+  if (-not $ready) { throw "$($svc.Name) did not become ready. See $logDir\server-error.log" }
+  Write-Host "[ready] $($svc.Name) pid=$($process.Id) logs=$logDir"
 }
 
 Write-Host ""

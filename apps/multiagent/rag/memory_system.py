@@ -3,15 +3,16 @@ Memory management system for dynamic, weighted memory retrieval.
 """
 from typing import Dict, List, Optional, Tuple
 from datetime import datetime
+from uuid import uuid4
 import json
 import math
 import os
 import re
 import shutil
 
-from rag.vector_store import VectorStore
-from rag.document_processor import DocumentProcessor
 from config import Config
+from pathlib import Path
+from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index
 
 
 class MemorySystem:
@@ -113,6 +114,8 @@ class MemorySystem:
     }
 
     def __init__(self, config: Config):
+        from rag.vector_store import VectorStore
+        from rag.document_processor import DocumentProcessor
         self.config = config
 
         self.memory_store = VectorStore(
@@ -215,17 +218,16 @@ class MemorySystem:
         """Load the structured memory index."""
         if os.path.exists(self.memory_index_path):
             try:
-                with open(self.memory_index_path, "r", encoding="utf-8") as f:
-                    return json.load(f)
+                return load_memory_index(Path(self.memory_index_path))
             except Exception:
-                return self._empty_memory_index()
-        return self._empty_memory_index()
+                return MemoryIndex(self._empty_memory_index())
+        return MemoryIndex(self._empty_memory_index())
 
     def _save_memory_index(self):
         """Persist the structured memory index."""
         os.makedirs(os.path.dirname(self.memory_index_path), exist_ok=True)
-        with open(self.memory_index_path, "w", encoding="utf-8") as f:
-            json.dump(self.memory_index, f, ensure_ascii=False, indent=2)
+        save_memory_index(Path(self.memory_index_path), self.memory_index)
+        self._rebuild_entry_lookup()
 
     def _normalize_memory_index(self):
         for bucket in self.MEMORY_BUCKETS:
@@ -827,7 +829,7 @@ class MemorySystem:
     ) -> str:
         """Store generated long-form text."""
         timestamp = datetime.now().isoformat()
-        memory_id = f"text_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['texts'])}"
+        memory_id = f"text_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['texts'])}" + "_" + uuid4().hex[:12]
         metadata = metadata or {}
 
         if store_vector:
@@ -870,7 +872,7 @@ class MemorySystem:
     ) -> str:
         """Store outline-like memory."""
         timestamp = datetime.now().isoformat()
-        memory_id = f"outline_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['outlines'])}"
+        memory_id = f"outline_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['outlines'])}" + "_" + uuid4().hex[:12]
         structure = structure or {}
 
         processed_docs = self.document_processor.process_document(outline)
@@ -955,7 +957,7 @@ class MemorySystem:
     ) -> str:
         """Store world-setting memory."""
         timestamp = datetime.now().isoformat()
-        memory_id = f"world_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['world_settings'])}"
+        memory_id = f"world_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['world_settings'])}" + "_" + uuid4().hex[:12]
 
         full_text = f"世界观设定：{setting_name}\n\n{setting_info}"
         processed_docs = self.document_processor.process_document(full_text)
@@ -994,7 +996,7 @@ class MemorySystem:
     ) -> str:
         """Store plot-point memory."""
         timestamp = datetime.now().isoformat()
-        memory_id = f"plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['plot_points'])}"
+        memory_id = f"plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['plot_points'])}" + "_" + uuid4().hex[:12]
         position = position or "unknown"
 
         processed_docs = self.document_processor.process_document(plot_point)

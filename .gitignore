@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+!.env.*.example
 .venv/
 .venv-shared/
 .local-dev-secrets/
@@ -11,3 +12,16 @@ apps/**/local_web_portal/data/*.key
 apps/**/local_web_portal/data/*.secret
 apps/**/local_web_portal/runs/**
 !apps/**/local_web_portal/runs/.keep
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+test-results/
+playwright-report/
+apps/**/runs/
+apps/**/vector_db/
+apps/**/local_web_portal/data/*.db-*
+apps/**/local_web_portal/data/*.db.*
+apps/**/local_web_portal/data/logs/
