@@ -149,16 +149,16 @@ def main():
                 )
                 page.set_viewport_size({"width": 390, "height": 844})
                 toggle = page.locator("[data-mobile-nav-toggle]")
-                assert toggle.is_visible()
-                assert page.locator("#workspace-navigation").evaluate(
-                    "node => node.inert"
+                expect(toggle).to_be_visible()
+                expect(page.locator("#workspace-navigation")).to_have_js_property(
+                    "inert", True
                 )
                 toggle.click()
                 assert toggle.get_attribute("aria-expanded") == "true"
                 page.keyboard.press("Escape")
                 assert toggle.get_attribute("aria-expanded") == "false"
-                assert page.locator("#workspace-navigation").evaluate(
-                    "node => node.inert"
+                expect(page.locator("#workspace-navigation")).to_have_js_property(
+                    "inert", True
                 )
                 page.locator("h1").click()
                 page.screenshot(
