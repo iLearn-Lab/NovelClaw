@@ -95,7 +95,7 @@ $services = @(
     Workdir = Join-Path $root "apps\multiagent"
     Python = Join-Path $root "apps\multiagent\.venv\Scripts\python.exe"
     Port = 8011
-    RequirementFiles = @("requirements.txt", "local_web_portal\requirements.txt")
+    RequirementFiles = @((Join-Path $root "requirements-web.txt"))
     Args = "-m uvicorn local_web_portal.app.main:app --host 127.0.0.1 --port 8011"
   },
   @{
@@ -103,7 +103,7 @@ $services = @(
     Workdir = Join-Path $root "apps\novelclaw"
     Python = Join-Path $root "apps\novelclaw\.venv\Scripts\python.exe"
     Port = 8012
-    RequirementFiles = @("requirements.txt", "local_web_portal\requirements.txt")
+    RequirementFiles = @((Join-Path $root "requirements-web.txt"))
     Args = "-m uvicorn local_web_portal.app.main:app --host 127.0.0.1 --port 8012"
   }
 )

@@ -118,7 +118,7 @@ def test_cancel_stops_worker_descendants(workspace, tmp_path):
     supervisor = importlib.import_module("utils.processes")
     ready = tmp_path / "ready"
     survived = tmp_path / "survived"
-    child = f"from pathlib import Path; import time; Path({str(ready)!r}).touch(); time.sleep(1); Path({str(survived)!r}).touch()"
+    child = f"from pathlib import Path; import time, signal; signal.signal(signal.SIGTERM, signal.SIG_IGN); Path({str(ready)!r}).touch(); time.sleep(1); Path({str(survived)!r}).touch()"
     parent = f"import subprocess, sys, time; subprocess.Popen([sys.executable, '-c', {child!r}]); time.sleep(30)"
     with pytest.raises(RuntimeError, match="canceled"):
         supervisor.run_logged_process(

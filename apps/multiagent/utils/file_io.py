@@ -7,6 +7,27 @@ import re
 import tempfile
 from pathlib import Path
 
+from filelock import FileLock
+
+
+class ContentConflictError(ValueError):
+    """A document changed after it was opened by the editor."""
+
+
+def save_text_version(
+    path: Path, content: str, *, base_content: str | None = None
+) -> None:
+    """Compare and replace a manuscript while holding a lock across both steps."""
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with FileLock(str(path) + ".lock", timeout=10):
+        if (
+            base_content is not None
+            and path.read_text(encoding="utf-8").strip() != base_content.strip()
+        ):
+            raise ContentConflictError("The manuscript changed since it was opened")
+        atomic_write_text(path, content)
+
 
 def tail_text(path: Path, max_chars: int = 12000) -> str:
     """Read only enough UTF-8 bytes for the requested tail, even for huge logs."""

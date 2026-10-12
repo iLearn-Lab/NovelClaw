@@ -295,13 +295,16 @@ def _run_worker_subprocess(
     worker_out.parent.mkdir(parents=True, exist_ok=True)
     worker_log = RUNS_DIR / run_id / "worker.log"
 
+    idea_path = worker_out.parent / "input.txt"
+    atomic_write_text(idea_path, idea)
+
     cmd = [
         sys.executable,
         "-u",
         "-m",
         "local_web_portal.worker_process",
-        "--idea",
-        idea,
+        "--idea-file",
+        str(idea_path),
         "--output-json",
         str(worker_out),
     ]

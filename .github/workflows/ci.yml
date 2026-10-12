@@ -65,3 +65,25 @@ jobs:
         with:
           name: browser-results
           path: test-results/
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the runtime image
+        run: docker build -t novelclaw:local .
+      - name: Generate chapters using the packaged workers
+        run: docker run --rm -v "$PWD/tests:/app/tests:ro" novelclaw:local python /app/scripts/generation-smoke.py
+      - name: Start all container services and verify the shared session
+        run: |
+          cp .env.auth-portal.example apps/auth-portal/.env
+          cp .env.multiagent.example apps/multiagent/.env
+          cp .env.novelclaw.example apps/novelclaw/.env
+          docker compose up -d --no-build --wait --wait-timeout 90
+          curl --fail --silent --show-error --location --cookie-jar "$RUNNER_TEMP/session" --cookie "$RUNNER_TEMP/session" http://127.0.0.1:8010/mode-b --output /dev/null
+      - name: Container diagnostics
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop test containers
+        if: always()
+        run: docker compose down

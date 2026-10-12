@@ -198,6 +198,43 @@ def main():
                 )
                 expect(reply).to_have_value("Preserve this writing brief.")
                 expect(reply).to_be_enabled()
+                # A canceled reply with a final user message must stop waiting.
+                page.set_content(
+                    '<section data-idea-copilot-root data-session-id="998" data-reply-pending="true"><div data-idea-feed></div><form data-idea-reply-form action="/idea-copilot/998/reply"><textarea name="reply"></textarea><button type="submit">Send</button></form></section>'
+                )
+                page.route(
+                    "**/api/idea-copilot/998/state?*",
+                    lambda route: route.fulfill(
+                        content_type="application/json",
+                        body=json.dumps(
+                            {
+                                "ok": True,
+                                "status": "canceled",
+                                "reply_pending": False,
+                                "messages": [
+                                    {"role": "user", "content": "Canceled request"}
+                                ],
+                            }
+                        ),
+                    ),
+                )
+                page.evaluate(
+                    "window.initIdeaCopilotLive(document.querySelector('[data-idea-copilot-root]'))"
+                )
+                expect(page.locator('textarea[name="reply"]')).to_be_enabled()
+                # An expired session may return HTML after a redirect, never success JSON.
+                page.route(
+                    "**/idea-copilot/998/reply",
+                    lambda route: route.fulfill(
+                        content_type="text/html", body="<html>Sign in</html>"
+                    ),
+                )
+                reply = page.locator('textarea[name="reply"]')
+                reply.fill("Preserve the draft after session expiry.")
+                page.locator('button[type="submit"]').click()
+                expect(page.locator("[data-idea-status]")).to_be_visible()
+                expect(reply).to_have_value("Preserve the draft after session expiry.")
+                expect(reply).to_be_enabled()
                 page.goto(portal + "/mode-a", wait_until="networkidle")
                 assert page.url.startswith(multi), page.url
                 for route in ("/dashboard", "/providers", "/sessions", "/jobs"):

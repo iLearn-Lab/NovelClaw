@@ -88,3 +88,41 @@ def test_memory_system_instances_share_new_entries(workspace, tmp_path):
         "Author's revision",
         "New chapter context",
     }
+
+
+def test_running_memory_observes_author_changes_before_next_step(workspace, tmp_path):
+    memory_type = importlib.import_module("rag.memory_system").MemorySystem
+    store = importlib.import_module("utils.memory_store")
+    config = SimpleNamespace(
+        embedding_model="none",
+        enable_rag=False,
+        vector_db_path=str(tmp_path),
+        memory_vector_db_path=str(tmp_path / "memory"),
+    )
+    memory = memory_type(config)
+    memory.store_outline("Old plan", "Novel")
+    path = tmp_path / "memory/memory_index.json"
+    author = store.load_memory_index(path)
+    author["outlines"][0]["content"] = "Author's new plan"
+    store.save_memory_index(path, author)
+    memory.refresh()
+    assert memory.get_outline_by_topic("Novel")["content"] == "Author's new plan"
+
+
+def test_multiagent_structured_memory_needs_no_vector_database(workspace, tmp_path):
+    if workspace.name != "multiagent":
+        pytest.skip("MultiAgent structured memory")
+    memory_type = importlib.import_module("rag.memory_system").MemorySystem
+    config = SimpleNamespace(
+        embedding_model="none",
+        enable_rag=False,
+        vector_db_path=str(tmp_path),
+        memory_vector_db_path=str(tmp_path / "memory"),
+    )
+    memory = memory_type(config)
+    memory.store_generated_text("Lin found the lighthouse map", "Novel")
+    memory.store_character("Lin", "The lighthouse keeper", "Novel")
+    memory.store_world_setting("Island", "A stormy coast", "Novel")
+    memory.store_outline("Find the map", "Novel")
+    assert memory.memory_store is None
+    assert memory.retrieve_memories("lighthouse map", topic="Novel")

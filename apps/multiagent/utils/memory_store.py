@@ -74,3 +74,12 @@ def save_memory_index(path: Path, index: MemoryIndex) -> None:
         index.clear()
         index.update(merged)
         index.base = deepcopy(merged)
+
+
+def refresh_memory_index(path: Path, index: MemoryIndex) -> None:
+    """Observe another writer's changes while preserving local unsaved fields."""
+    current = load_memory_index(path)
+    merged = _merge(index.base, dict(index), dict(current))
+    index.clear()
+    index.update(merged)
+    index.base = deepcopy(dict(current))

@@ -11,7 +11,7 @@ import re
 import shutil
 from config import Config
 from pathlib import Path
-from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index
+from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index, refresh_memory_index
 
 
 class MemorySystem:
@@ -180,6 +180,9 @@ class MemorySystem:
         for outline in self.memory_index.get("outlines", []):
             outline.setdefault("content", "")
     
+    def refresh(self):
+        refresh_memory_index(Path(self.memory_index_path), self.memory_index)
+
     def _save_memory_index(self):
         """保存记忆索引"""
         os.makedirs(os.path.dirname(self.memory_index_path), exist_ok=True)

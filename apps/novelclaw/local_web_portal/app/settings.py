@@ -8,8 +8,8 @@ from dotenv import load_dotenv
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-load_dotenv(BASE_DIR / ".env", override=False)
-load_dotenv(BASE_DIR.parent / ".env", override=False)
+load_dotenv(BASE_DIR / ".env", override=False, encoding="utf-8-sig")
+load_dotenv(BASE_DIR.parent / ".env", override=False, encoding="utf-8-sig")
 
 DATA_DIR = Path(os.getenv("APP_DATA_DIR", "").strip() or BASE_DIR / "data").expanduser()
 if not DATA_DIR.is_absolute():

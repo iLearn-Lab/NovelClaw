@@ -4,6 +4,7 @@ import json
 import re
 from pathlib import Path
 from typing import Any, Dict, List
+from utils.file_io import atomic_write_text
 
 
 class WorkspaceToolAgent:
@@ -287,7 +288,9 @@ Candidate excerpt:
         return [line for line in lines if line][:8]
 
     def _write_file(self, relative_path: str, content: str) -> Path:
-        path = self.workspace_root() / relative_path
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(str(content or "").strip() + "\n", encoding="utf-8")
+        root = self.workspace_root().resolve()
+        path = (root / relative_path).resolve()
+        if not path.is_relative_to(root) or path == root:
+            raise ValueError("Workspace artifacts must stay inside the current run")
+        atomic_write_text(path, str(content or "").strip() + "\n")
         return path

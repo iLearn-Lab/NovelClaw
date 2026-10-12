@@ -1,17 +1,11 @@
 # NovelClaw Docker Image
-FROM python:3.10-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    git \
-    && rm -rf /var/lib/apt/lists/*
-
 # Keep dependency installation cached when only source or templates change.
+COPY requirements-web.txt /app/requirements-web.txt
 COPY apps/auth-portal/requirements.txt /app/apps/auth-portal/requirements.txt
 COPY apps/multiagent/requirements.txt /app/apps/multiagent/requirements.txt
 COPY apps/multiagent/local_web_portal/requirements.txt /app/apps/multiagent/local_web_portal/requirements.txt
@@ -21,12 +15,15 @@ COPY apps/novelclaw/local_web_portal/requirements.txt /app/apps/novelclaw/local_
 # Install Python dependencies for all services
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
-RUN pip install --no-cache-dir \
-    -r /app/apps/auth-portal/requirements.txt \
-    -r /app/apps/multiagent/requirements.txt \
-    -r /app/apps/multiagent/local_web_portal/requirements.txt \
-    -r /app/apps/novelclaw/requirements.txt \
-    -r /app/apps/novelclaw/local_web_portal/requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements-web.txt && pip check
+
+# Optional dependencies for CLI vector retrieval and local embedding models.
+ARG INSTALL_VECTOR_DEPS=false
+RUN if [ "$INSTALL_VECTOR_DEPS" = "true" ]; then \
+    apt-get update && apt-get install -y --no-install-recommends gcc g++ git && \
+    pip install --no-cache-dir -r /app/apps/multiagent/requirements.txt -r /app/apps/novelclaw/requirements.txt && \
+    rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY apps/ /app/apps/
 COPY scripts/ /app/scripts/

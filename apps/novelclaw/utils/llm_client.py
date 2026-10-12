@@ -1,190 +1,353 @@
-"""
-LLM 客户端封装，支持 Codex/OpenAI/DeepSeek（默认指向 packycode Codex）
-"""
-from typing import List, Dict, Optional, Any
+"""Chat and Responses transports for OpenAI-compatible writing providers."""
+
+from __future__ import annotations
+
+from copy import deepcopy
 import json
 import re
 import time
-from openai import OpenAI
+from typing import Any
+from uuid import uuid4
+
+from openai import APIStatusError, BadRequestError, OpenAI
+
 from config import Config
 
 
+class ModelResponseError(ValueError):
+    """The provider replied, but did not return usable text or a valid tool call."""
+
+
 class LLMClient:
-    """LLM API 客户端封装"""
-    
     def __init__(self, config: Config):
         self.config = config
-        timeout_seconds = getattr(config, "llm_timeout_seconds", 0)
-        client_timeout = None if timeout_seconds <= 0 else timeout_seconds
+        timeout = getattr(config, "llm_timeout_seconds", 0)
         self.client = OpenAI(
             api_key=config.api_key,
             base_url=config.api_base_url,
-            timeout=client_timeout,
+            timeout=None if timeout <= 0 else timeout,
             max_retries=getattr(config, "llm_max_retries", 1),
         )
+        self._text_only_models: set[str] = set()
+
+    def close(self) -> None:
+        self.client.close()
 
     def _is_en(self) -> bool:
-        return str(getattr(self.config, "language", "auto") or "auto").lower().startswith("en")
+        return str(getattr(self.config, "language", "auto")).lower().startswith("en")
 
     def _text(self, zh: str, en: str) -> str:
         return en if self._is_en() else zh
-    
-    def chat(
-        self,
-        messages: List[Dict[str, str]],
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None,
-        model: Optional[str] = None
-    ) -> str:
-        """
-        调用 LLM 进行对话
-        """
-        max_t = max_tokens if max_tokens is not None else self.config.max_tokens
-        if max_t is None:
-            max_t = 2000
-        max_t = min(max_t, 8000)
-        messages = list(messages)
-        if self.config.language.startswith("en"):
-            messages.insert(
+
+    def _messages(self, messages: list[dict]) -> list[dict]:
+        prepared = deepcopy(messages)
+        language = str(getattr(self.config, "language", "auto")).lower()
+        if language.startswith(("en", "zh")):
+            prepared.insert(
                 0,
                 {
                     "role": "system",
-                    "content": "You are an English-language assistant. Always respond in English, even if the user prompt mixes other languages.",
+                    "content": "Always respond in English."
+                    if language.startswith("en")
+                    else "请始终使用中文回答。",
                 },
             )
-        elif self.config.language.startswith("zh"):
-            messages.insert(
-                0,
-                {
-                    "role": "system",
-                    "content": "你是一名中文助手，请始终使用中文回答，即便用户提示混杂其他语言。",
-                },
-            )
-        try:
-            if getattr(self.config, "llm_call_log", True):
-                timeout_display = "disabled" if getattr(self.config, "llm_timeout_seconds", 0) <= 0 else f"{getattr(self.config, 'llm_timeout_seconds', 0)}s"
-                print(
-                    f"[LLM] {self._text('开始', 'start')} provider={self.config.llm_provider} "
-                    f"model={model or self.config.model_name} "
-                    f"wire={getattr(self.config, 'wire_api', 'chat')} "
-                    f"timeout={timeout_display}"
+        return prepared
+
+    @staticmethod
+    def _responses_input(messages: list[dict]) -> list[dict]:
+        items = []
+        for message in messages:
+            # Preserve reasoning items and native call IDs on subsequent tool turns.
+            if message.get("_response_items") is not None:
+                items.extend(deepcopy(message["_response_items"]))
+            elif message.get("role") == "tool":
+                items.append(
+                    {
+                        "type": "function_call_output",
+                        "call_id": message["tool_call_id"],
+                        "output": str(message.get("content") or ""),
+                    }
                 )
-            started = time.perf_counter()
-            if getattr(self.config, "wire_api", "chat") == "responses":
-                # 将 messages 展开为文本输入，尽量保留角色信息
-                joined = "\n".join([f"{m.get('role','user').upper()}: {m.get('content','')}" for m in messages])
-                response = self.client.responses.create(
-                    model=model or self.config.model_name,
-                    input=joined,
-                    max_output_tokens=max_t,
-                    temperature=temperature if temperature is not None else self.config.temperature,
-                    reasoning={"effort": getattr(self.config, "model_reasoning_effort", "high") if hasattr(self.config, "model_reasoning_effort") else "high"},
-                )
-                output = response.output_text
             else:
-                response = self.client.chat.completions.create(
-                    model=model or self.config.model_name,
-                    messages=messages,
-                    temperature=temperature if temperature is not None else self.config.temperature,
-                    max_tokens=max_t
+                if message.get("content") is not None:
+                    items.append(
+                        {
+                            "role": message.get("role", "user"),
+                            "content": message["content"],
+                        }
+                    )
+                for call in message.get("tool_calls") or []:
+                    items.append(
+                        {
+                            "type": "function_call",
+                            "call_id": call["id"],
+                            "name": call["function"]["name"],
+                            "arguments": call["function"]["arguments"],
+                        }
+                    )
+        return items
+
+    @staticmethod
+    def _plain_history(messages: list[dict]) -> list[dict]:
+        """Text-only providers cannot accept native tool messages in the history."""
+        result = []
+        for message in messages:
+            content = str(message.get("content") or "")
+            if message.get("tool_calls"):
+                content += "\nTool requests: " + json.dumps(
+                    message["tool_calls"], ensure_ascii=False
                 )
-                output = response.choices[0].message.content
-            if getattr(self.config, "llm_call_log", True):
-                cost = time.perf_counter() - started
-                print(f"[LLM] {self._text('完成', 'done')} model={model or self.config.model_name} elapsed={cost:.2f}s")
-            return output
-        except Exception as e:
-            if getattr(self.config, "llm_call_log", True):
-                cost = time.perf_counter() - started
-                print(f"[LLM] {self._text('失败', 'failed')} model={model or self.config.model_name} elapsed={cost:.2f}s err={e}")
-            raise Exception(self._text(f"LLM 调用失败: {str(e)}", f"LLM call failed: {str(e)}"))
-    
-    def chat_with_tools(
-        self,
-        messages: List[Dict],
-        tools: List[Dict],
-        temperature: float = 0.2,
-        max_tokens: int = 1200,
-        model: Optional[str] = None,
-    ) -> Dict[str, Any]:
-        """
-        真正的 OpenClaw/ReAct 工具调用接口。
-        返回 {"content": str, "tool_calls": [{"id", "name", "args"}]}。
-        若模型不支持 native tool calling，自动降级为 JSON 文本解析。
-        """
-        target_model = model or self.config.model_name
-        started = time.perf_counter()
-        if getattr(self.config, "llm_call_log", True):
-            print(f"[Claw] tool-call provider={self.config.llm_provider} model={target_model} tools={[t['function']['name'] for t in tools]}")
-        try:
-            response = self.client.chat.completions.create(
-                model=target_model,
-                messages=messages,
-                tools=tools,
-                temperature=temperature,
+            role = message.get("role", "user")
+            if role == "tool":
+                role = "user"
+                content = f"Tool result ({message.get('tool_call_id', '')}): {content}"
+            if content:
+                result.append({"role": role, "content": content})
+        return result
+
+    def _request(self, messages, *, model, temperature, max_tokens, tools=None):
+        wire = getattr(self.config, "wire_api", "chat")
+        payload: dict[str, Any] = {"model": model, "temperature": temperature}
+        if wire == "responses":
+            create = self.client.responses.create
+            payload.update(
+                input=self._responses_input(messages),
+                max_output_tokens=max_tokens,
+                store=False,
+            )
+            effort = getattr(self.config, "model_reasoning_effort", "")
+            if effort:
+                payload["reasoning"] = {"effort": effort}
+            if tools is not None:
+                payload["tools"] = [
+                    {"type": "function", **deepcopy(tool["function"]), "strict": False}
+                    for tool in tools
+                ]
+                payload["include"] = ["reasoning.encrypted_content"]
+        else:
+            create = self.client.chat.completions.create
+            payload.update(
+                messages=[
+                    {k: v for k, v in item.items() if not k.startswith("_")}
+                    for item in messages
+                ],
                 max_tokens=max_tokens,
             )
-            msg = response.choices[0].message
-            tool_calls = []
-            if msg.tool_calls:
-                for tc in msg.tool_calls:
-                    try:
-                        args = json.loads(tc.function.arguments or "{}")
-                    except Exception:
-                        args = {}
-                    tool_calls.append({"id": tc.id, "name": tc.function.name, "args": args})
-            if getattr(self.config, "llm_call_log", True):
-                elapsed = time.perf_counter() - started
-                action = tool_calls[0]["name"] if tool_calls else "text-reply"
-                print(f"[Claw] done action={action} elapsed={elapsed:.2f}s")
-            return {"content": msg.content or "", "tool_calls": tool_calls}
-        except Exception as native_err:
-            # 降级：文本模式下要求 LLM 输出 JSON 工具调用
-            if getattr(self.config, "llm_call_log", True):
-                print(f"[Claw] native tool-call failed ({native_err}), falling back to JSON mode")
-            tool_names = [t["function"]["name"] for t in tools]
-            tool_descs = "\n".join(
-                f'- {t["function"]["name"]}: {t["function"]["description"]}'
-                for t in tools
-            )
-            fallback_messages = list(messages) + [{
-                "role": "user",
-                "content": (
-                    f"Available tools:\n{tool_descs}\n\n"
-                    f"Reply ONLY with a JSON object: {{\"tool\": \"<one of {tool_names}>\", \"args\": {{...}}}}"
-                ),
-            }]
+            if tools is not None:
+                payload["tools"] = tools
+        if tools is not None:
+            # The writing loop executes one action at a time.
+            payload["parallel_tool_calls"] = False
+
+        # Adapt only when the provider explicitly rejects an optional parameter.
+        # Authentication, connection, rate-limit and server errors retain SDK retries
+        # and propagate to the job; none of them means "this model cannot use tools".
+        for _ in range(3):
             try:
-                raw = self.chat(fallback_messages, temperature=temperature, max_tokens=600, model=target_model)
-                m = re.search(r"\{.*\}", raw, re.S)
-                if m:
-                    parsed = json.loads(m.group(0))
-                    tool_name = str(parsed.get("tool") or "").strip()
-                    if tool_name in tool_names:
-                        elapsed = time.perf_counter() - started
-                        if getattr(self.config, "llm_call_log", True):
-                            print(f"[Claw] fallback action={tool_name} elapsed={elapsed:.2f}s")
-                        return {
-                            "content": "",
-                            "tool_calls": [{"id": "fb-0", "name": tool_name, "args": parsed.get("args", {})}],
-                        }
-            except Exception:
-                pass
-            return {"content": "", "tool_calls": []}
+                return create(**payload)
+            except BadRequestError as exc:
+                unsupported = (
+                    "not support" in str(exc).lower()
+                    or getattr(exc, "code", "") == "unsupported_parameter"
+                )
+                parameter = getattr(exc, "param", None)
+                if (
+                    unsupported
+                    and parameter == "temperature"
+                    and "temperature" in payload
+                ):
+                    payload.pop("temperature")
+                elif (
+                    unsupported
+                    and parameter == "max_tokens"
+                    and "max_tokens" in payload
+                ):
+                    payload["max_completion_tokens"] = payload.pop("max_tokens")
+                else:
+                    raise
+        raise ModelResponseError("Provider rejected the supported request parameters")
+
+    @staticmethod
+    def _tool_arguments(raw: str, name: str, allowed: set[str]) -> dict:
+        if name not in allowed:
+            raise ModelResponseError(f"Provider requested an unavailable tool: {name}")
+        try:
+            arguments = json.loads(raw or "{}")
+        except (TypeError, ValueError) as exc:
+            raise ModelResponseError(
+                f"Invalid JSON arguments for tool: {name}"
+            ) from exc
+        if not isinstance(arguments, dict):
+            raise ModelResponseError(f"Tool arguments must be an object: {name}")
+        return arguments
+
+    @staticmethod
+    def _unsupported_tools(exc: APIStatusError) -> bool:
+        message = str(exc).lower()
+        parameter = str(getattr(exc, "param", "") or "").split(".")[0].split("[")[0]
+        if parameter and parameter not in {
+            "tools",
+            "functions",
+            "tool_choice",
+            "function_call",
+            "parallel_tool_calls",
+        }:
+            return False
+        if getattr(exc, "code", "") in {
+            "invalid_function_parameters",
+            "invalid_json_schema",
+        }:
+            return False
+        return (
+            exc.status_code in {400, 404, 422, 501}
+            and bool(re.search(r"tools?|function", message))
+            and any(
+                term in message
+                for term in (
+                    "not support",
+                    "unsupported",
+                    "not implemented",
+                    "unknown parameter",
+                    "unrecognized",
+                )
+            )
+        )
+
+    def chat(self, messages, temperature=None, max_tokens=None, model=None) -> str:
+        target = model or self.config.model_name
+        started = time.perf_counter()
+        if getattr(self.config, "llm_call_log", True):
+            print(
+                f"[LLM] start model={target} wire={getattr(self.config, 'wire_api', 'chat')}"
+            )
+        response = self._request(
+            self._messages(messages),
+            model=target,
+            temperature=self.config.temperature if temperature is None else temperature,
+            max_tokens=max(
+                1,
+                int(
+                    (self.config.max_tokens if max_tokens is None else max_tokens)
+                    or 2000
+                ),
+            ),
+        )
+        if getattr(self.config, "wire_api", "chat") == "responses":
+            output = response.output_text
+        else:
+            if not response.choices:
+                raise ModelResponseError("Provider returned no completion choices")
+            output = response.choices[0].message.content
+        if not isinstance(output, str) or not output.strip():
+            raise ModelResponseError(
+                "Provider returned no text; check model availability and output limits"
+            )
+        if getattr(self.config, "llm_call_log", True):
+            print(
+                f"[LLM] done model={target} elapsed={time.perf_counter() - started:.2f}s"
+            )
+        return output
+
+    def chat_with_tools(
+        self, messages, tools, temperature=0.2, max_tokens=1200, model=None
+    ) -> dict[str, Any]:
+        target = model or self.config.model_name
+        allowed = {tool["function"]["name"] for tool in tools}
+        if target not in self._text_only_models:
+            try:
+                response = self._request(
+                    self._messages(messages),
+                    model=target,
+                    temperature=temperature,
+                    max_tokens=max_tokens,
+                    tools=tools,
+                )
+            except APIStatusError as exc:
+                if not self._unsupported_tools(exc):
+                    raise
+                self._text_only_models.add(target)
+            else:
+                calls = []
+                result = {}
+                if getattr(self.config, "wire_api", "chat") == "responses":
+                    result["response_items"] = [
+                        item.model_dump(exclude_none=True) for item in response.output
+                    ]
+                    content = response.output_text
+                    for item in response.output:
+                        if item.type == "function_call":
+                            calls.append(
+                                {
+                                    "id": item.call_id,
+                                    "name": item.name,
+                                    "args": self._tool_arguments(
+                                        item.arguments, item.name, allowed
+                                    ),
+                                }
+                            )
+                else:
+                    if not response.choices:
+                        raise ModelResponseError(
+                            "Provider returned no completion choices"
+                        )
+                    message = response.choices[0].message
+                    content = message.content or ""
+                    for call in message.tool_calls or []:
+                        calls.append(
+                            {
+                                "id": call.id,
+                                "name": call.function.name,
+                                "args": self._tool_arguments(
+                                    call.function.arguments, call.function.name, allowed
+                                ),
+                            }
+                        )
+                if len(calls) > 1:
+                    raise ModelResponseError(
+                        "Provider returned parallel tool calls although parallel_tool_calls is disabled"
+                    )
+                if not calls and not content.strip():
+                    raise ModelResponseError(
+                        "Provider returned neither text nor a tool call"
+                    )
+                return {**result, "content": content, "tool_calls": calls}
+
+        prompt = {
+            "role": "user",
+            "content": "Available functions and argument schemas:\n"
+            + json.dumps(tools, ensure_ascii=False)
+            + '\nReply only with JSON: {"tool": "function_name", "args": {...}}',
+        }
+        raw = self.chat(
+            self._plain_history(messages) + [prompt],
+            temperature=temperature,
+            max_tokens=max_tokens,
+            model=target,
+        )
+        match = re.search(r"\{.*\}", raw, re.S)
+        try:
+            parsed = json.loads(match.group(0) if match else raw)
+        except ValueError as exc:
+            raise ModelResponseError(
+                "Text-only provider did not return a JSON tool call"
+            ) from exc
+        if not isinstance(parsed, dict):
+            raise ModelResponseError("Text-only provider did not return a tool object")
+        name = str(parsed.get("tool") or "")
+        args = self._tool_arguments(json.dumps(parsed.get("args", {})), name, allowed)
+        return {
+            "content": "",
+            "tool_calls": [
+                {"id": f"fallback_{uuid4().hex}", "name": name, "args": args}
+            ],
+        }
 
     def generate(
-        self,
-        prompt: str,
-        system_prompt: Optional[str] = None,
-        temperature: Optional[float] = None,
-        max_tokens: Optional[int] = None
+        self, prompt, system_prompt=None, temperature=None, max_tokens=None
     ) -> str:
-        """
-        生成文本
-        """
-        messages = []
-        if system_prompt:
-            messages.append({"role": "system", "content": system_prompt})
+        messages = (
+            [{"role": "system", "content": system_prompt}] if system_prompt else []
+        )
         messages.append({"role": "user", "content": prompt})
-
         return self.chat(messages, temperature, max_tokens)

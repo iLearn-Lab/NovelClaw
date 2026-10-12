@@ -1,3 +1,5 @@
+param([switch]$WithVectorDependencies)
+
 $ErrorActionPreference = "Stop"
 $root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $venv = Join-Path $root ".venv-shared"
@@ -43,54 +45,14 @@ if ($LASTEXITCODE -ne 0) {
   throw "Failed to upgrade pip in shared virtual environment: $python"
 }
 
-function Install-RequirementFileLight {
-  param(
-    [string]$RequirementFile
-  )
+& $python -m pip install -r (Join-Path $root "requirements-web.txt")
+if ($LASTEXITCODE -ne 0) { throw "Failed to install web runtime dependencies." }
 
-  if (-not (Test-Path $RequirementFile)) {
-    return
-  }
-
-  $temp = Join-Path $env:TEMP ("colong-lite-" + [System.IO.Path]::GetRandomFileName() + ".txt")
-  $skipPrefixes = @(
-    "sentence-transformers",
-    "torch",
-    "torchvision",
-    "torchaudio",
-    "transformers",
-    "safetensors",
-    "scikit-learn",
-    "scipy",
-    "threadpoolctl",
-    "joblib",
-    "networkx"
-  )
-
-  $lines = Get-Content $RequirementFile | Where-Object {
-    $line = ($_ | Out-String).Trim()
-    if (-not $line -or $line.StartsWith("#")) { return $true }
-    foreach ($prefix in $skipPrefixes) {
-      if ($line -like "$prefix*") { return $false }
-    }
-    return $true
-  }
-
-  Set-Content -Path $temp -Value $lines -Encoding UTF8
-  try {
-    & $python -m pip install -r $temp
-    if ($LASTEXITCODE -ne 0) {
-      throw "Failed to install requirements from $RequirementFile"
-    }
-  } finally {
-    Remove-Item $temp -Force -ErrorAction SilentlyContinue
+if ($WithVectorDependencies) {
+  foreach ($app in @("multiagent", "novelclaw")) {
+    & $python -m pip install -r (Join-Path $root "apps\$app\requirements.txt")
+    if ($LASTEXITCODE -ne 0) { throw "Failed to install vector dependencies for $app." }
   }
 }
-
-Install-RequirementFileLight -RequirementFile (Join-Path $root "apps\auth-portal\requirements.txt")
-Install-RequirementFileLight -RequirementFile (Join-Path $root "apps\multiagent\requirements.txt")
-Install-RequirementFileLight -RequirementFile (Join-Path $root "apps\multiagent\local_web_portal\requirements.txt")
-Install-RequirementFileLight -RequirementFile (Join-Path $root "apps\novelclaw\requirements.txt")
-Install-RequirementFileLight -RequirementFile (Join-Path $root "apps\novelclaw\local_web_portal\requirements.txt")
 
 Write-Host "[ok] shared venv ready: $python"

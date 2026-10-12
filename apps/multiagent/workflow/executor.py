@@ -3,6 +3,10 @@
 """
 from typing import Dict, List, Optional, Tuple
 import math
+from pathlib import Path
+from utils.file_io import atomic_write_text, save_text_version
+from utils.text_metrics import text_length, truncate_text, summarize_consistency
+from utils.artifacts import latest_chapter_files
 from config import Config
 import json
 from utils.llm_client import LLMClient
@@ -336,6 +340,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
         generated_content = []
         iteration = 0
         best_result = None
+        chapter_checks = []
         best_reward = 0.0
         # 确定计划总章数：优先用章节大纲数量，否则用估算
         if planned_total <= 0:
@@ -343,6 +348,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
         max_iterations = min(planned_total, getattr(self.config, "max_total_iterations", planned_total))
         
         while iteration < max_iterations:
+            self.memory_system.refresh()
             iteration += 1
             self.chapter_counter += 1
             print(f"\n[Executor] 开始第 {iteration} 轮迭代...")
@@ -420,7 +426,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
             # 组装本章正文（仅当前章的结果），便于长度判断与后续校验
             combined_text = self._combine_texts(round_results)
             story_text = self._combine_story_text(round_results) or combined_text
-            story_len = len(story_text)
+            story_len = self._measure_text(story_text)
 
             # 不做任何补写/重写，仅记录与大纲长度区间的偏差
             if story_len < chapter_min_required or story_len > chapter_max_allowed:
@@ -554,6 +560,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
             else:
                 round_results_for_eval = round_results
             # 将本章最终文本写入记忆（修改后版本）
+            chapter_checks.append(consistency_result)
             story_text = self._sanitize_chapter_text(story_text, self.chapter_counter)
             try:
                 self.memory_system.store_generated_text(
@@ -565,10 +572,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
             except Exception:
                 pass
             # 将本章最终文本写入文件，便于溯源
-            try:
-                self._write_chapter_file(self.chapter_counter, story_text, iteration, topic)
-            except Exception:
-                pass
+            self._write_chapter_file(self.chapter_counter, story_text, iteration, topic)
             # 记录进度（字数、章节）
             try:
                 self._write_progress_log(
@@ -642,7 +646,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
         if not stitched_text:
             stitched_text = self._combine_texts(generated_content)
 
-        final_text = self._refine_final_text(stitched_text, topic) if stitched_text else ""
+        final_text = stitched_text
         # 存储最终文本
         if final_text:
             self.memory_system.store_generated_text(final_text, topic)
@@ -651,9 +655,7 @@ You are writing segment {idx+1}/{seg_count} of a long English story. Continue th
                 self.memory_system.store_outline(outline, topic)
         
         # 最终一致性检查
-        final_consistency = self.consistency_checker.comprehensive_check(
-            final_text, topic
-        )
+        final_consistency = summarize_consistency(chapter_checks)
         
         return {
             "idea": idea,
@@ -1550,9 +1552,8 @@ Global outline:
         os.makedirs(run_dir, exist_ok=True)
         fname = f"chapter_{chapter_no:02d}_iter_{iteration:02d}_final.txt"
         path = os.path.join(run_dir, fname)
-        with open(path, "w", encoding="utf-8") as f:
-            book_title = self.book_title or topic
-            f.write(f"书名：{book_title}\n章节：第{chapter_no}章\n\n{story_text}")
+        book_title = self.book_title or topic
+        save_text_version(Path(path), f"书名：{book_title}\n章节：第{chapter_no}章\n\n{story_text}")
 
     def _safe_excerpt(self, text: str, limit: int = 300) -> str:
         cleaned = " ".join((text or "").split())
@@ -1599,19 +1600,11 @@ Global outline:
         high = max(low + 200, int((chapter_target or 1000) * 1.12))
         return low, high, "target_fallback"
 
+    def _measure_text(self, text: str) -> int:
+        return text_length(text, self.lang)
+
     def _truncate_text_soft(self, text: str, limit: int) -> str:
-        if len(text) <= limit:
-            return text
-        scan_to = min(len(text), limit + 260)
-        scan_from = max(0, int(limit * 0.7))
-        cut = -1
-        for sep in ["。", "！", "？", ".", "!", "?", "\n"]:
-            pos = text.rfind(sep, scan_from, scan_to)
-            if pos > cut:
-                cut = pos
-        if cut >= scan_from:
-            return text[: cut + 1].rstrip()
-        return text[:limit].rstrip()
+        return truncate_text(text, limit, self.lang)
 
     def _is_chapter_heading_line(self, line: str, chapter_no: int) -> bool:
         stripped = str(line or "").strip()
@@ -1671,7 +1664,7 @@ Global outline:
 
         max_rounds = max(1, int(getattr(self.config, "max_chapter_subrounds", 3) or 3))
         for _ in range(max_rounds):
-            cur_len = len(text)
+            cur_len = self._measure_text(text)
             if chapter_min_required <= cur_len <= chapter_max_allowed:
                 break
 
@@ -1713,7 +1706,7 @@ Original chapter:
                         text = self._sanitize_chapter_text(rewritten, chapter_no)
                         self._append_progress_event(
                             "chapter_length_fix",
-                            f"mode=shrink_to_range, words={len(text)}",
+                            f"mode=shrink_to_range, words={self._measure_text(text)}",
                             chapter_no,
                         )
                         continue
@@ -1722,7 +1715,7 @@ Original chapter:
                 text = self._truncate_text_soft(text, chapter_max_allowed)
                 self._append_progress_event(
                     "chapter_length_fix",
-                    f"mode=truncate_fallback, words={len(text)}",
+                    f"mode=truncate_fallback, words={self._measure_text(text)}",
                     chapter_no,
                 )
                 continue
@@ -1770,21 +1763,21 @@ Current chapter text:
             text = self._sanitize_chapter_text(text + "\n\n" + continuation, chapter_no)
             self._append_progress_event(
                 "chapter_length_fix",
-                f"mode=expand_to_min, words={len(text)}",
+                f"mode=expand_to_min, words={self._measure_text(text)}",
                 chapter_no,
             )
 
-        if len(text) > chapter_max_allowed:
+        if self._measure_text(text) > chapter_max_allowed:
             text = self._truncate_text_soft(text, chapter_max_allowed)
             self._append_progress_event(
                 "chapter_length_fix",
-                f"mode=final_truncate, words={len(text)}",
+                f"mode=final_truncate, words={self._measure_text(text)}",
                 chapter_no,
             )
-        if len(text) < chapter_min_required:
+        if self._measure_text(text) < chapter_min_required:
             self._append_progress_event(
                 "chapter_length_warning",
-                f"still_below_min words={len(text)} min={chapter_min_required}",
+                f"still_below_min words={self._measure_text(text)} min={chapter_min_required}",
                 chapter_no,
             )
         return self._sanitize_chapter_text(text, chapter_no)
@@ -1872,6 +1865,9 @@ Current chapter text:
         """
         将 memory 中的章节最终稿（chapter_final）按章节号排序拼合，生成全书正文。
         """
+        files = latest_chapter_files(Path(self.config.runs_dir) / self.config.run_id)
+        if files:
+            return "\n\n".join(path.read_text(encoding="utf-8").strip() for path in files)
         texts = [
             t for t in self.memory_system.memory_index.get("texts", [])
             if t.get("topic") == topic and t.get("metadata", {}).get("source") == "chapter_final"
@@ -1901,7 +1897,7 @@ Current chapter text:
         path = os.path.join(self.config.runs_dir, self.config.run_id, "progress.log")
         if not os.path.exists(path):
             return ""
-        total = 0
+        chapter_lengths = {}
         lines = []
         with open(path, "r", encoding="utf-8") as f:
             for line in f:
@@ -1911,10 +1907,11 @@ Current chapter text:
                 lines.append(line)
                 try:
                     parts = self._parse_progress_kv(line)
-                    total += int(parts.get("words", 0))
+                    if line.startswith("chapter=") and parts.get("chapter"):
+                        chapter_lengths[int(parts["chapter"])] = int(parts.get("words", 0))
                 except Exception:
                     pass
-        lines.append(f"total_words={total}")
+        lines.append(f"total_words={sum(chapter_lengths.values())}")
         return "\n".join(lines)
 
     def _compute_total_words(self) -> int:

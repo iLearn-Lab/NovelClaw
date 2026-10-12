@@ -1,0 +1,5 @@
+# Default web workers use structured memory without embedding downloads.
+-r apps/auth-portal/requirements.txt
+-r apps/multiagent/local_web_portal/requirements.txt
+-r apps/novelclaw/local_web_portal/requirements.txt
+openai>=1.66,<4

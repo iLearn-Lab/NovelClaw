@@ -19,6 +19,7 @@ from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
 from capability_registry import enabled_claw_actions
+from utils.file_io import atomic_write_text
 
 
 # ---------------------------------------------------------------------------
@@ -51,7 +52,7 @@ def _ask_user_web(question: str, timeout: int = 90) -> str:
     except Exception:
         pass
     # Write the question
-    ask_path.write_text(
+    atomic_write_text(ask_path,
         json.dumps({"question": question, "ts": time.time()}, ensure_ascii=False),
         encoding="utf-8",
     )
@@ -478,6 +479,7 @@ class OpenClawManager:
         # True ReAct loop — LLM calls tools until it calls `finalize`
         # ----------------------------------------------------------------
         for step in range(1, max_steps + 1):
+            self.executor.memory_system.refresh()
             state["step"] = step
 
             for interrupt_message in _drain_user_interrupts():
@@ -538,6 +540,7 @@ class OpenClawManager:
             messages.append({
                 "role": "assistant",
                 "content": response.get("content") or None,
+                **({"_response_items": response["response_items"]} if "response_items" in response else {}),
                 "tool_calls": [{
                     "id": tc["id"],
                     "type": "function",
@@ -671,7 +674,7 @@ class OpenClawManager:
         print(
             f"[OpenClaw] Loop complete — steps={state['step']}, "
             f"reward={float(final.get('reward_score', 0.0) or 0.0):.3f}, "
-            f"length={int(final.get('story_length', 0) or 0)} chars\n"
+            f"length={int(final.get('story_length', 0) or 0)} words/characters\n"
             f"{'=' * 60}\n"
         )
         return final
@@ -696,7 +699,7 @@ class OpenClawManager:
                 f"Chapter: {self.executor.chapter_counter}\n"
                 f"Title: {title or 'Untitled'}\n"
                 f"Topic: {state['topic']}\n"
-                f"Target length: {state['chapter_min_required']}-{state['chapter_max_allowed']} chars\n"
+                f"Target length: {state['chapter_min_required']}-{state['chapter_max_allowed']} words/characters\n"
                 f"Genre: {state.get('genre') or '-'}\n"
                 f"Style tags: {', '.join(state.get('style_tags') or []) or '-'}\n\n"
                 f"Unified planning packet:\n{planning_packet.get('packet_text') or '(none available)'}\n\n"
@@ -729,7 +732,7 @@ class OpenClawManager:
         provisional_note = " | status=provisional_interrupt" if candidate.get("provisional") else ""
         if story_text:
             return (
-                f"draft_length={len(story_text)} chars | "
+                f"draft_length={self.executor._measure_text(story_text)} words/characters | "
                 f"reward={reward:.3f} | issues={len(issues)} ({issue_text}){provisional_note} | "
                 f"tools_used=[{', '.join(support_types)}] | "
                 f"target={state['chapter_min_required']}-{state['chapter_max_allowed']}\n"
@@ -757,7 +760,7 @@ class OpenClawManager:
             round_results.append(writer_result)
         return {
             "story_text": story_text,
-            "story_length": len(story_text),
+            "story_length": self.executor._measure_text(story_text),
             "round_results": round_results,
             "evaluation": {},
             "reward": {
@@ -905,7 +908,7 @@ class OpenClawManager:
         excerpt = self.executor._safe_excerpt(str(candidate.get("story_text") or ""), 600)
         status = " | status=provisional_interrupt" if candidate.get("provisional") else ""
         return (
-            f"[{label}] reward={reward:.3f} | length={length} chars | issues={len(issues)} ({issue_text}){status}\n"
+            f"[{label}] reward={reward:.3f} | length={length} words/characters | issues={len(issues)} ({issue_text}){status}\n"
             f"Excerpt:\n{excerpt}"
         )
 
@@ -997,7 +1000,7 @@ class OpenClawManager:
             "要求：只输出正文，不要标注、解释或提纲。",
             f"Write the full prose for chapter {self.executor.chapter_counter}.\n"
             f"Topic: {state['topic']}  Title: {title or 'Untitled'}\n"
-            f"Target: {state['chapter_min_required']}-{state['chapter_max_allowed']} chars\n\n"
+            f"Target: {state['chapter_min_required']}-{state['chapter_max_allowed']} words/characters\n\n"
             f"Unified planning packet:\n{packet_text or '(advance naturally from established story)'}\n\n"
             "Output full prose only, with no bullets, labels, or explanations.",
         )
@@ -1159,7 +1162,7 @@ class OpenClawManager:
                 f"Write the full prose for chapter {self.executor.chapter_counter}.\n"
                 f"Topic: {state['topic']}\n"
                 f"Title: {title or 'Untitled'}\n"
-                f"Target: {state['chapter_min_required']}-{state['chapter_max_allowed']} chars\n\n"
+                f"Target: {state['chapter_min_required']}-{state['chapter_max_allowed']} words/characters\n\n"
                 f"Unified planning packet:\n{packet_text or '(advance naturally from the established story)'}\n\n"
                 "Output prose only. No bullets, labels, or explanations."
             ),

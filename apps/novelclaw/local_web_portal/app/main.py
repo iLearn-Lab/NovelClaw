@@ -6,7 +6,6 @@ import re
 import secrets
 import shutil
 import threading
-import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -16,7 +15,7 @@ from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request, stat
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from starlette.middleware.sessions import SessionMiddleware
@@ -25,7 +24,8 @@ from config import Config
 from rag.memory_system import MemorySystem
 from utils.language_detector import detect_language
 from utils.llm_client import LLMClient
-from utils.file_io import atomic_write_text, resolve_run_directory, tail_text
+from utils.file_io import atomic_write_text, resolve_run_directory, tail_text, save_text_version, ContentConflictError
+from utils.artifacts import chapter_outputs, latest_chapter_files
 from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index
 
 from agents.idea_copilot_agent import (
@@ -41,6 +41,7 @@ from agents.idea_copilot_agent import (
 )
 from .db import SessionLocal, engine, get_db, open_auth_db
 from .job_runner import run_generation_job
+from .downloads import output_download_response, chapters_archive_response
 from .models import ApiCredential, Base, CapabilityPreference, GenerationJob, IdeaCopilotSession, ProviderConfig, User
 from .provider_registry import (
     ProviderSpec,
@@ -2503,6 +2504,8 @@ def _assistant_turn_indicates_generation(turn: Dict[str, object]) -> bool:
 
 
 def _start_generation_from_idea_session(db: Session, session: IdeaCopilotSession, user_id: int) -> GenerationJob:
+    if session.user_id != user_id:
+        raise ValueError("Session belongs to a different user")
     if session.final_job_id:
         existing = db.get(GenerationJob, session.final_job_id)
         if existing:
@@ -2512,6 +2515,20 @@ def _start_generation_from_idea_session(db: Session, session: IdeaCopilotSession
     final_idea = build_generation_idea(session.original_idea, state)
     if not final_idea.strip():
         raise ValueError("Final idea is empty")
+
+    # Claim the session before allocating a job, in the same transaction.
+    claimed = db.execute(update(IdeaCopilotSession).where(
+        IdeaCopilotSession.id == session.id,
+        IdeaCopilotSession.status == "active",
+        IdeaCopilotSession.final_job_id.is_(None),
+        IdeaCopilotSession.conversation_json == session.conversation_json,
+    ).values(status="confirmed")).rowcount
+    if not claimed:
+        db.rollback()
+        db.refresh(session)
+        if session.final_job_id:
+            return db.get(GenerationJob, session.final_job_id)
+        raise ValueError("Session changed; refresh before confirming generation")
 
     job = _create_generation_job(db, user_id, session.provider, final_idea, commit=False)
     session.status = "confirmed"
@@ -2561,16 +2578,36 @@ def _detach_job_from_sessions(db: Session, job_id: int) -> None:
         session.final_job_id = None
 
 
+def _save_reply_if_current(db: Session, session: IdeaCopilotSession, original_json: str, state: Dict, readiness: int) -> bool:
+    changed = db.execute(update(IdeaCopilotSession).where(
+        IdeaCopilotSession.id == session.id,
+        IdeaCopilotSession.status == "active",
+        IdeaCopilotSession.conversation_json == original_json,
+    ).values(
+        conversation_json=dump_state(state),
+        refined_idea=str(state.get("refined_idea") or session.original_idea),
+        round_count=int(state.get("round", 0) or 0),
+        readiness_score=readiness,
+    )).rowcount
+    db.commit()
+    if changed:
+        db.refresh(session)
+    return bool(changed)
+
+
 def _run_idea_copilot_reply_worker(session_id: int) -> None:
     with SessionLocal() as db:
         session = db.get(IdeaCopilotSession, session_id)
-        if not session:
+        if not session or session.status != "active":
             return
         user = db.get(User, session.user_id)
         if not user:
             return
 
         state = load_state(session.conversation_json)
+        original_json = session.conversation_json
+        if not state.get("reply_pending"):
+            return
         messages = list(state.get("messages") or [])
         latest_user_reply = ""
         for item in reversed(messages):
@@ -2583,8 +2620,7 @@ def _run_idea_copilot_reply_worker(session_id: int) -> None:
         if not spec:
             state["reply_pending"] = False
             state["reply_error"] = "Provider is no longer available"
-            session.conversation_json = dump_state(state)
-            db.commit()
+            _save_reply_if_current(db, session, original_json, state, session.readiness_score)
             return
 
         try:
@@ -2622,11 +2658,8 @@ def _run_idea_copilot_reply_worker(session_id: int) -> None:
                 state = append_assistant_turn(state, turn)
                 state["reply_pending"] = False
                 state["reply_error"] = ""
-                session.conversation_json = dump_state(state)
-                session.refined_idea = str(state.get("refined_idea") or session.refined_idea or session.original_idea)
-                session.round_count = int(state.get("round", 0) or 0)
-                session.readiness_score = 100
-                db.commit()
+                if not _save_reply_if_current(db, session, original_json, state, 100):
+                    return
                 _remember_session_turn(session, state, turn=turn)
                 _start_generation_from_idea_session(db, session, user.id)
                 return
@@ -2641,11 +2674,8 @@ def _run_idea_copilot_reply_worker(session_id: int) -> None:
             state = append_assistant_turn(state, turn)
             state["reply_pending"] = False
             state["reply_error"] = ""
-            session.conversation_json = dump_state(state)
-            session.refined_idea = str(state.get("refined_idea") or session.refined_idea or session.original_idea)
-            session.round_count = int(state.get("round", 0) or 0)
-            session.readiness_score = int(turn.get("readiness", 0) or 0)
-            db.commit()
+            if not _save_reply_if_current(db, session, original_json, state, int(turn.get("readiness", 0) or 0)):
+                return
             _remember_session_turn(session, state, turn=turn)
             if _assistant_turn_indicates_generation(turn):
                 session = db.get(IdeaCopilotSession, session_id)
@@ -2654,11 +2684,11 @@ def _run_idea_copilot_reply_worker(session_id: int) -> None:
                     db.commit()
                     _start_generation_from_idea_session(db, session, user.id)
         except Exception as exc:
-            state = load_state(session.conversation_json)
+            db.rollback()
+            state = load_state(original_json)
             state["reply_pending"] = False
             state["reply_error"] = str(exc)
-            session.conversation_json = dump_state(state)
-            db.commit()
+            _save_reply_if_current(db, session, original_json, state, session.readiness_score)
 
 
 def _start_idea_copilot_reply_worker(session_id: int) -> None:
@@ -2883,7 +2913,7 @@ def _job_progress_payload(job: GenerationJob) -> Dict[str, object]:
         run_dir = _resolve_run_dir(job.run_id)
         worker_log_text = _tail_text(run_dir / "worker.log")
         progress_log_text = _tail_text(run_dir / "progress.log")
-        chapters = _load_chapter_outputs(run_dir)
+        chapters = _load_chapter_outputs(run_dir, include_content=False)
     try:
         progress_snapshot = _build_progress_snapshot(job, run_dir, worker_log_text, progress_log_text)
     except Exception:
@@ -2923,7 +2953,7 @@ def _api_job_payload(job: GenerationJob, *, include_logs: bool = False) -> Dict[
 def _api_chapters_payload(job: GenerationJob, include_content: bool = True) -> List[Dict[str, object]]:
     if not job.run_id:
         return []
-    chapters = _load_chapter_outputs(_resolve_run_dir(job.run_id))
+    chapters = _load_chapter_outputs(_resolve_run_dir(job.run_id), include_content=include_content)
     if include_content:
         return chapters
     return [{k: v for k, v in item.items() if k != "content"} for item in chapters]
@@ -3075,24 +3105,8 @@ def api_v1_story_chapter(story_id: int, chapter_no: int, _: None = Depends(_requ
 def api_v1_story_export(story_id: int, _: None = Depends(_require_agent_token), db: Session = Depends(get_db)):
     user = _agent_user(db)
     job = _agent_job(db, user.id, story_id)
-    file_name = f"story_{job.id}_{job.run_id or 'no_run'}_export.txt"
-    if job.output_path:
-        out_path = Path(job.output_path)
-        if out_path.exists() and out_path.is_file():
-            return FileResponse(str(out_path), media_type="text/plain; charset=utf-8", filename=file_name)
-
-    chapters = _api_chapters_payload(job, include_content=True)
-    if not chapters:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No output available yet")
-    parts = []
-    for item in chapters:
-        parts.append(f"Chapter {item.get('chapter', '?')}\n\n{str(item.get('content') or '').strip()}")
-    merged = ("\n\n" + ("=" * 60) + "\n\n").join(parts)
-    return PlainTextResponse(
-        merged,
-        media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
-    )
+    filename = f"story_{job.id}_{job.run_id or 'no_run'}_export.txt"
+    return output_download_response(_resolve_run_dir(job.run_id) if job.run_id else None, job.output_path, filename)
 
 
 def _to_utc(dt: Optional[datetime]) -> Optional[datetime]:
@@ -3633,79 +3647,16 @@ def _build_progress_snapshot(job: GenerationJob, run_dir: Optional[Path], worker
     return snapshot
 
 
-def _load_chapter_outputs(run_dir: Path) -> List[Dict]:
-    """
-    Load latest finalized chapter files from runs/<run_id>/chapters.
-    Keep only the highest iteration per chapter.
-    """
-    chapter_dir = run_dir / "chapters"
-    if not chapter_dir.exists():
-        return []
-
-    pattern = re.compile(r"^chapter_(\d+)_iter_(\d+)_final\.txt$")
-    latest_by_chapter: Dict[int, Dict] = {}
-
-    for path in chapter_dir.glob("chapter_*_iter_*_final.txt"):
-        m = pattern.match(path.name)
-        if not m:
-            continue
-        chapter_no = int(m.group(1))
-        iteration = int(m.group(2))
-
-        prev = latest_by_chapter.get(chapter_no)
-        if prev and iteration <= prev["iteration"]:
-            continue
-
-        try:
-            content = path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
-            content = ""
-
-        latest_by_chapter[chapter_no] = {
-            "chapter": chapter_no,
-            "iteration": iteration,
-            "filename": path.name,
-            "content": content.strip(),
-        }
-
-    return [latest_by_chapter[k] for k in sorted(latest_by_chapter.keys())]
+def _load_chapter_outputs(run_dir: Path, include_content: bool = True) -> List[Dict]:
+    return chapter_outputs(run_dir, include_content=include_content)
 
 
 def _latest_chapter_file(run_dir: Path, chapter_no: int) -> Optional[Path]:
-    chapter_dir = run_dir / "chapters"
-    if not chapter_dir.exists():
-        return None
-    pattern = re.compile(rf"^chapter_{chapter_no:02d}_iter_(\d+)_final\.txt$")
-    best_path: Optional[Path] = None
-    best_iter = -1
-    for path in chapter_dir.glob(f"chapter_{chapter_no:02d}_iter_*_final.txt"):
-        m = pattern.match(path.name)
-        if not m:
-            continue
-        iteration = int(m.group(1))
-        if iteration > best_iter:
-            best_iter = iteration
-            best_path = path
-    return best_path
+    return next((path for path in latest_chapter_files(run_dir) if int(path.name.split("_")[1]) == chapter_no), None)
 
 
 def _latest_chapter_files(run_dir: Path) -> List[Path]:
-    chapter_dir = run_dir / "chapters"
-    if not chapter_dir.exists():
-        return []
-    pattern = re.compile(r"^chapter_(\d+)_iter_(\d+)_final\.txt$")
-    latest: Dict[int, Dict[str, object]] = {}
-    for path in chapter_dir.glob("chapter_*_iter_*_final.txt"):
-        m = pattern.match(path.name)
-        if not m:
-            continue
-        chapter_no = int(m.group(1))
-        iteration = int(m.group(2))
-        prev = latest.get(chapter_no)
-        if prev and iteration <= int(prev["iteration"]):
-            continue
-        latest[chapter_no] = {"iteration": iteration, "path": path}
-    return [latest[k]["path"] for k in sorted(latest.keys()) if isinstance(latest[k]["path"], Path)]
+    return latest_chapter_files(run_dir)
 
 
 @app.get("/")
@@ -4519,9 +4470,17 @@ def idea_copilot_reply(
     state["reply_pending"] = True
     state["reply_error"] = ""
     state["reply_started_at"] = datetime.now(timezone.utc).isoformat()
-    session.conversation_json = dump_state(state)
-    session.refined_idea = str(state.get("refined_idea") or session.refined_idea or session.original_idea)
+    accepted = db.execute(update(IdeaCopilotSession).where(
+        IdeaCopilotSession.id == session.id,
+        IdeaCopilotSession.status == "active",
+        IdeaCopilotSession.conversation_json == session.conversation_json,
+    ).values(conversation_json=dump_state(state), refined_idea=str(state.get("refined_idea") or session.refined_idea or session.original_idea))).rowcount
     db.commit()
+    if not accepted:
+        if request.headers.get("x-requested-with") == "fetch":
+            return JSONResponse({"ok": False, "error": "The session changed; refresh before sending another reply"}, status_code=409)
+        return _redirect_with_notice(f"/console/chat?session_id={session_id}", error="The session changed; refresh before sending another reply")
+    db.refresh(session)
     _remember_session_turn(session, state, user_reply=answer)
     _start_idea_copilot_reply_worker(session_id)
 
@@ -4577,6 +4536,9 @@ async def idea_copilot_brief_edit(
     # Also patch the conversation state so polls return updated brief
     state = load_state(session.conversation_json)
     state["refined_idea"] = new_brief
+    if state.get("reply_pending"):
+        state["reply_pending"] = False
+        state["reply_error"] = _ui_text(_ui_language(request), "简报已更新，请发送新消息继续。", "The brief was updated. Send a new message to continue.")
     session.conversation_json = dump_state(state)
     db.commit()
     return JSONResponse({"ok": True, "refined_idea": new_brief})
@@ -4625,6 +4587,10 @@ def idea_copilot_cancel(session_id: int, request: Request, db: Session = Depends
 
     if session.status in {"active", "confirmed"}:
         session.status = "canceled"
+    state = load_state(session.conversation_json)
+    state["reply_pending"] = False
+    state["reply_error"] = ""
+    session.conversation_json = dump_state(state)
     session.finished_at = datetime.now(timezone.utc)
     db.commit()
     return _redirect_with_notice(
@@ -4920,38 +4886,9 @@ def download_job_output(job_id: int, request: Request, db: Session = Depends(get
     if not job or job.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    run_id = (job.run_id or "").strip()
-    file_name = f"job_{job.id}_{run_id or 'no_run'}_output.txt"
-
-    if job.output_path:
-        out_path = Path(job.output_path)
-        if out_path.exists() and out_path.is_file():
-            return FileResponse(
-                str(out_path),
-                media_type="text/plain; charset=utf-8",
-                filename=file_name,
-            )
-
-    if not run_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No output available yet")
-
-    run_dir = _resolve_run_dir(run_id)
-    chapters = _load_chapter_outputs(run_dir)
-    if not chapters:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No output available yet")
-
-    parts: List[str] = []
-    for ch in chapters:
-        chapter_no = ch.get("chapter", "?")
-        content = (ch.get("content") or "").strip()
-        parts.append(f"Chapter {chapter_no}\n\n{content}")
-    merged = ("\n\n" + ("=" * 60) + "\n\n").join(parts)
-
-    return PlainTextResponse(
-        merged,
-        media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
-    )
+    run_id = str(job.run_id or "").strip()
+    filename = f"job_{job.id}_{run_id or 'no_run'}_output.txt"
+    return output_download_response(_resolve_run_dir(run_id) if run_id else None, job.output_path, filename)
 
 
 @app.get("/jobs/{job_id}/download/chapter/{chapter_no}")
@@ -4993,20 +4930,7 @@ def download_job_chapters(job_id: int, request: Request, db: Session = Depends(g
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No chapter output available yet")
 
     run_dir = _resolve_run_dir(job.run_id)
-    chapter_files = _latest_chapter_files(run_dir)
-    if not chapter_files:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No chapter output available yet")
-
-    zip_path = run_dir / f"job_{job.id}_chapters_latest.zip"
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for path in chapter_files:
-            zf.write(path, arcname=path.name)
-
-    return FileResponse(
-        str(zip_path),
-        media_type="application/zip",
-        filename=zip_path.name,
-    )
+    return chapters_archive_response(run_dir, job.id)
 
 
 @app.get("/api/runs/{run_id}/memory-banks")
@@ -5146,15 +5070,14 @@ async def api_update_chapter_content(run_id: str, chapter_no: int, request: Requ
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chapter output not found")
 
     normalized = content.rstrip() + "\n"
-    if "base_content" in body:
-        current_content = chapter_path.read_text(encoding="utf-8")
-        if current_content.strip() != str(body["base_content"]).strip():
-            raise HTTPException(status_code=409, detail=_ui_text(
-                _ui_language(request),
-                "章节已被更新。请保留当前修改，刷新后合并内容。",
-                "This chapter has changed. Keep your edits, then refresh and merge them.",
-            ))
-    atomic_write_text(chapter_path, normalized)
+    try:
+        save_text_version(chapter_path, normalized, base_content=str(body["base_content"]) if "base_content" in body else None)
+    except ContentConflictError:
+        raise HTTPException(status_code=409, detail=_ui_text(
+            _ui_language(request),
+            "章节已被更新。请保留当前修改，刷新后合并内容。",
+            "This chapter has changed. Keep your edits, then refresh and merge them.",
+        ))
     lines = [line.strip() for line in normalized.splitlines() if line.strip()]
     title = lines[0] if lines else chapter_path.name
     return JSONResponse(

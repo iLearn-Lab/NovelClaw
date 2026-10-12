@@ -12,7 +12,7 @@ import shutil
 
 from config import Config
 from pathlib import Path
-from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index
+from utils.memory_store import MemoryIndex, load_memory_index, save_memory_index, refresh_memory_index
 
 
 class MemorySystem:
@@ -114,16 +114,16 @@ class MemorySystem:
     }
 
     def __init__(self, config: Config):
-        from rag.vector_store import VectorStore
-        from rag.document_processor import DocumentProcessor
         self.config = config
-
-        self.memory_store = VectorStore(
-            config,
-            collection_name="memory_collection",
-            db_path=getattr(config, "memory_vector_db_path", None) or config.vector_db_path,
-        )
-        self.document_processor = DocumentProcessor(config)
+        embedding = str(getattr(config, "embedding_model", "none") or "none").lower()
+        self.vector_memory_enabled = bool(getattr(config, "enable_rag", False)) and embedding not in {"", "none", "noop", "disable", "disabled"}
+        self.memory_store = None
+        self.document_processor = None
+        if self.vector_memory_enabled:
+            from rag.vector_store import VectorStore
+            from rag.document_processor import DocumentProcessor
+            self.memory_store = VectorStore(config, collection_name="memory_collection", db_path=getattr(config, "memory_vector_db_path", None) or config.vector_db_path)
+            self.document_processor = DocumentProcessor(config)
 
         self.memory_index_path = os.path.join(
             getattr(config, "memory_vector_db_path", config.vector_db_path),
@@ -152,7 +152,7 @@ class MemorySystem:
         Migrate legacy memory_collection from vector_db_path into memory_vector_db_path.
         """
         new_path = getattr(self.config, "memory_vector_db_path", None)
-        if not new_path:
+        if not new_path or not self.vector_memory_enabled:
             return
 
         try:
@@ -222,6 +222,10 @@ class MemorySystem:
             except Exception:
                 return MemoryIndex(self._empty_memory_index())
         return MemoryIndex(self._empty_memory_index())
+
+    def refresh(self):
+        refresh_memory_index(Path(self.memory_index_path), self.memory_index)
+        self._rebuild_entry_lookup()
 
     def _save_memory_index(self):
         """Persist the structured memory index."""
@@ -832,7 +836,7 @@ class MemorySystem:
         memory_id = f"text_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['texts'])}" + "_" + uuid4().hex[:12]
         metadata = metadata or {}
 
-        if store_vector:
+        if store_vector and self.vector_memory_enabled:
             processed_docs = self.document_processor.process_document(text)
             for doc in processed_docs:
                 doc["metadata"].update(
@@ -875,17 +879,18 @@ class MemorySystem:
         memory_id = f"outline_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['outlines'])}" + "_" + uuid4().hex[:12]
         structure = structure or {}
 
-        processed_docs = self.document_processor.process_document(outline)
-        for doc in processed_docs:
-            doc["metadata"].update(
-                {
-                    "type": "outline",
-                    "memory_id": memory_id,
-                    "topic": topic,
-                    "timestamp": timestamp,
-                }
-            )
-        self.memory_store.add_documents(processed_docs)
+        if self.vector_memory_enabled:
+            processed_docs = self.document_processor.process_document(outline)
+            for doc in processed_docs:
+                doc["metadata"].update(
+                    {
+                        "type": "outline",
+                        "memory_id": memory_id,
+                        "topic": topic,
+                        "timestamp": timestamp,
+                    }
+                )
+            self.memory_store.add_documents(processed_docs)
 
         entry = {
             "id": memory_id,
@@ -920,18 +925,19 @@ class MemorySystem:
         if attributes:
             full_text += f"\n\n人物属性：\n{json.dumps(attributes, ensure_ascii=False, indent=2)}"
 
-        processed_docs = self.document_processor.process_document(full_text)
-        for doc in processed_docs:
-            doc["metadata"].update(
-                {
-                    "type": "character",
-                    "memory_id": memory_id,
-                    "character_name": character_name,
-                    "topic": topic,
-                    "timestamp": timestamp,
-                }
-            )
-        self.memory_store.add_documents(processed_docs)
+        if self.vector_memory_enabled:
+            processed_docs = self.document_processor.process_document(full_text)
+            for doc in processed_docs:
+                doc["metadata"].update(
+                    {
+                        "type": "character",
+                        "memory_id": memory_id,
+                        "character_name": character_name,
+                        "topic": topic,
+                        "timestamp": timestamp,
+                    }
+                )
+            self.memory_store.add_documents(processed_docs)
 
         entry = {
             "id": memory_id,
@@ -960,18 +966,19 @@ class MemorySystem:
         memory_id = f"world_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['world_settings'])}" + "_" + uuid4().hex[:12]
 
         full_text = f"世界观设定：{setting_name}\n\n{setting_info}"
-        processed_docs = self.document_processor.process_document(full_text)
-        for doc in processed_docs:
-            doc["metadata"].update(
-                {
-                    "type": "world_setting",
-                    "memory_id": memory_id,
-                    "setting_name": setting_name,
-                    "topic": topic,
-                    "timestamp": timestamp,
-                }
-            )
-        self.memory_store.add_documents(processed_docs)
+        if self.vector_memory_enabled:
+            processed_docs = self.document_processor.process_document(full_text)
+            for doc in processed_docs:
+                doc["metadata"].update(
+                    {
+                        "type": "world_setting",
+                        "memory_id": memory_id,
+                        "setting_name": setting_name,
+                        "topic": topic,
+                        "timestamp": timestamp,
+                    }
+                )
+            self.memory_store.add_documents(processed_docs)
 
         entry = {
             "id": memory_id,
@@ -999,18 +1006,19 @@ class MemorySystem:
         memory_id = f"plot_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{len(self.memory_index['plot_points'])}" + "_" + uuid4().hex[:12]
         position = position or "unknown"
 
-        processed_docs = self.document_processor.process_document(plot_point)
-        for doc in processed_docs:
-            doc["metadata"].update(
-                {
-                    "type": "plot_point",
-                    "memory_id": memory_id,
-                    "topic": topic,
-                    "position": position,
-                    "timestamp": timestamp,
-                }
-            )
-        self.memory_store.add_documents(processed_docs)
+        if self.vector_memory_enabled:
+            processed_docs = self.document_processor.process_document(plot_point)
+            for doc in processed_docs:
+                doc["metadata"].update(
+                    {
+                        "type": "plot_point",
+                        "memory_id": memory_id,
+                        "topic": topic,
+                        "position": position,
+                        "timestamp": timestamp,
+                    }
+                )
+            self.memory_store.add_documents(processed_docs)
 
         entry = {
             "id": memory_id,
@@ -1041,19 +1049,20 @@ class MemorySystem:
         )
         metadata = metadata or {}
 
-        processed_docs = self.document_processor.process_document(card_text)
-        for doc in processed_docs:
-            doc["metadata"].update(
-                {
-                    "type": "fact_card",
-                    "memory_id": memory_id,
-                    "topic": topic,
-                    "card_type": card_type,
-                    "timestamp": timestamp,
-                    **metadata,
-                }
-            )
-        self.memory_store.add_documents(processed_docs)
+        if self.vector_memory_enabled:
+            processed_docs = self.document_processor.process_document(card_text)
+            for doc in processed_docs:
+                doc["metadata"].update(
+                    {
+                        "type": "fact_card",
+                        "memory_id": memory_id,
+                        "topic": topic,
+                        "card_type": card_type,
+                        "timestamp": timestamp,
+                        **metadata,
+                    }
+                )
+            self.memory_store.add_documents(processed_docs)
 
         entry = {
             "id": memory_id,
@@ -1104,7 +1113,7 @@ class MemorySystem:
         total_weights = self._score_weights(include_semantic=True)
         dynamic_weights = self._score_weights(include_semantic=False)
 
-        if self.document_processor.embedding_model is None:
+        if self.document_processor is None or self.document_processor.embedding_model is None:
             ranked = []
             for bucket, entry in self._iter_candidate_entries(topic, normalized_types, current_chapter):
                 memory_type = self._infer_memory_type(bucket, entry=entry)

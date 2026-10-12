@@ -4,7 +4,6 @@ import json
 import os
 import re
 import shutil
-import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -29,10 +28,12 @@ from agents.idea_copilot_agent import (
 )
 from .auth_bridge import sync_user_from_auth_db
 from utils.file_io import resolve_run_directory, tail_text
+from utils.artifacts import chapter_outputs, latest_chapter_files
 
 from .db import SessionLocal, engine, get_db
 from .i18n import get_locale, install_i18n, set_locale, translate
 from .job_launcher import start_generation_job_process
+from .downloads import output_download_response, chapters_archive_response
 from .models import ApiCredential, Base, GenerationJob, IdeaCopilotSession, ProviderConfig, User
 from .provider_registry import (
     ProviderSpec,
@@ -1036,79 +1037,16 @@ def _build_progress_snapshot(
     return snapshot
 
 
-def _load_chapter_outputs(run_dir: Path) -> List[Dict]:
-    """
-    Load latest finalized chapter files from runs/<run_id>/chapters.
-    Keep only the highest iteration per chapter.
-    """
-    chapter_dir = run_dir / "chapters"
-    if not chapter_dir.exists():
-        return []
-
-    pattern = re.compile(r"^chapter_(\d+)_iter_(\d+)_final\.txt$")
-    latest_by_chapter: Dict[int, Dict] = {}
-
-    for path in chapter_dir.glob("chapter_*_iter_*_final.txt"):
-        m = pattern.match(path.name)
-        if not m:
-            continue
-        chapter_no = int(m.group(1))
-        iteration = int(m.group(2))
-
-        prev = latest_by_chapter.get(chapter_no)
-        if prev and iteration <= prev["iteration"]:
-            continue
-
-        try:
-            content = path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
-            content = ""
-
-        latest_by_chapter[chapter_no] = {
-            "chapter": chapter_no,
-            "iteration": iteration,
-            "filename": path.name,
-            "content": content.strip(),
-        }
-
-    return [latest_by_chapter[k] for k in sorted(latest_by_chapter.keys())]
+def _load_chapter_outputs(run_dir: Path, include_content: bool = True) -> List[Dict]:
+    return chapter_outputs(run_dir, include_content=include_content)
 
 
 def _latest_chapter_file(run_dir: Path, chapter_no: int) -> Optional[Path]:
-    chapter_dir = run_dir / "chapters"
-    if not chapter_dir.exists():
-        return None
-    pattern = re.compile(rf"^chapter_{chapter_no:02d}_iter_(\d+)_final\.txt$")
-    best_path: Optional[Path] = None
-    best_iter = -1
-    for path in chapter_dir.glob(f"chapter_{chapter_no:02d}_iter_*_final.txt"):
-        m = pattern.match(path.name)
-        if not m:
-            continue
-        iteration = int(m.group(1))
-        if iteration > best_iter:
-            best_iter = iteration
-            best_path = path
-    return best_path
+    return next((path for path in latest_chapter_files(run_dir) if int(path.name.split("_")[1]) == chapter_no), None)
 
 
 def _latest_chapter_files(run_dir: Path) -> List[Path]:
-    chapter_dir = run_dir / "chapters"
-    if not chapter_dir.exists():
-        return []
-    pattern = re.compile(r"^chapter_(\d+)_iter_(\d+)_final\.txt$")
-    latest: Dict[int, Dict[str, object]] = {}
-    for path in chapter_dir.glob("chapter_*_iter_*_final.txt"):
-        m = pattern.match(path.name)
-        if not m:
-            continue
-        chapter_no = int(m.group(1))
-        iteration = int(m.group(2))
-        prev = latest.get(chapter_no)
-        if prev and iteration <= int(prev["iteration"]):
-            continue
-        latest[chapter_no] = {"iteration": iteration, "path": path}
-    return [latest[k]["path"] for k in sorted(latest.keys()) if isinstance(latest[k]["path"], Path)]
+    return latest_chapter_files(run_dir)
 
 
 @app.get("/")
@@ -1754,38 +1692,9 @@ def download_job_output(job_id: int, request: Request, db: Session = Depends(get
     if not job or job.user_id != user.id:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    run_id = (job.run_id or "").strip()
-    file_name = f"job_{job.id}_{run_id or 'no_run'}_output.txt"
-
-    if job.output_path:
-        out_path = Path(job.output_path)
-        if out_path.exists() and out_path.is_file():
-            return FileResponse(
-                str(out_path),
-                media_type="text/plain; charset=utf-8",
-                filename=file_name,
-            )
-
-    if not run_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No output available yet")
-
-    run_dir = _resolve_run_dir(run_id)
-    chapters = _load_chapter_outputs(run_dir)
-    if not chapters:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No output available yet")
-
-    parts: List[str] = []
-    for ch in chapters:
-        chapter_no = ch.get("chapter", "?")
-        content = (ch.get("content") or "").strip()
-        parts.append(f"Chapter {chapter_no}\n\n{content}")
-    merged = ("\n\n" + ("=" * 60) + "\n\n").join(parts)
-
-    return PlainTextResponse(
-        merged,
-        media_type="text/plain; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{file_name}"'},
-    )
+    run_id = str(job.run_id or "").strip()
+    filename = f"job_{job.id}_{run_id or 'no_run'}_output.txt"
+    return output_download_response(_resolve_run_dir(run_id) if run_id else None, job.output_path, filename)
 
 
 @app.get("/jobs/{job_id}/download/chapter/{chapter_no}")
@@ -1827,17 +1736,4 @@ def download_job_chapters(job_id: int, request: Request, db: Session = Depends(g
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No chapter output available yet")
 
     run_dir = _resolve_run_dir(job.run_id)
-    chapter_files = _latest_chapter_files(run_dir)
-    if not chapter_files:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No chapter output available yet")
-
-    zip_path = run_dir / f"job_{job.id}_chapters_latest.zip"
-    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for path in chapter_files:
-            zf.write(path, arcname=path.name)
-
-    return FileResponse(
-        str(zip_path),
-        media_type="application/zip",
-        filename=zip_path.name,
-    )
+    return chapters_archive_response(run_dir, job.id)

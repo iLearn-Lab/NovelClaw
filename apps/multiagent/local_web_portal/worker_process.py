@@ -6,6 +6,7 @@ import json
 import os
 import traceback
 from pathlib import Path
+from utils.file_io import atomic_write_text
 
 
 def run_worker(idea: str, output_json: str) -> int:
@@ -22,6 +23,8 @@ def run_worker(idea: str, output_json: str) -> int:
     }
 
     try:
+        if not idea.strip():
+            raise ValueError("The writing brief cannot be empty")
         from config import Config
         from workflow.executor import CompositiveExecutor
 
@@ -54,6 +57,8 @@ def run_worker(idea: str, output_json: str) -> int:
             initial_knowledge=initial_knowledge,
             auto_analyze=True,
         )
+        if not str(result.get("final_text") or "").strip():
+            raise ValueError("Generation finished without manuscript text")
         payload["ok"] = True
         payload["result"] = result
     except Exception as exc:
@@ -61,16 +66,19 @@ def run_worker(idea: str, output_json: str) -> int:
         payload["error"] = str(exc)
         payload["traceback"] = traceback.format_exc()
 
-    output_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+    atomic_write_text(output_path, json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
     return 0 if payload["ok"] else 1
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Run Long-Story generation in isolated worker process.")
-    parser.add_argument("--idea", required=True, help="User story idea.")
+    source = parser.add_mutually_exclusive_group(required=True)
+    source.add_argument("--idea", help="User story idea.")
+    source.add_argument("--idea-file", type=Path, help="UTF-8 story brief file.")
     parser.add_argument("--output-json", required=True, help="Path for worker output JSON.")
     args = parser.parse_args()
-    return run_worker(idea=args.idea, output_json=args.output_json)
+    idea = args.idea_file.read_text(encoding="utf-8-sig") if args.idea_file else args.idea
+    return run_worker(idea=idea, output_json=args.output_json)
 
 
 if __name__ == "__main__":

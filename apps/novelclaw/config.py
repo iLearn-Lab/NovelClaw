@@ -143,6 +143,7 @@ class Config:
         self.max_tokens: int = int(os.getenv("MAX_TOKENS", "8000"))
         # LLM call timeout/retry controls. Set LLM_TIMEOUT_SECONDS=0 to disable request timeout.
         self.llm_timeout_seconds: int = int(os.getenv("LLM_TIMEOUT_SECONDS", "0"))
+        self.model_reasoning_effort: str = os.getenv("MODEL_REASONING_EFFORT", "").strip()
         self.llm_max_retries: int = int(os.getenv("LLM_MAX_RETRIES", "1"))
         default_model = "deepseek-chat" if self.llm_provider == "deepseek" else "gpt-5.2"
         self.model_name: str = os.getenv("MODEL_NAME", default_model)

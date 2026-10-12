@@ -221,8 +221,9 @@
       if (contentType.includes('application/json')) {
         return response.json();
       }
-      const raw = await response.text();
-      return { ok: response.ok, error: raw || response.statusText || 'Request failed' };
+      throw new Error(document.documentElement.lang.toLowerCase().startsWith('zh')
+        ? '会话或服务器响应异常。请刷新页面后重试，输入内容已保留。'
+        : 'Unexpected server response. Refresh the page and retry; your input has been kept.');
     }
 
     function setBusy(isBusy) {
@@ -255,6 +256,11 @@
       });
       const payload = await readPayload(response);
       if (!response.ok || !payload.ok) {
+        if ([401, 403, 404, 410].includes(response.status)) {
+          if (polling) polling.stop();
+          setBusy(false);
+          setStatus('error', normalizeError(payload, 'Session unavailable'));
+        }
         throw new Error(normalizeError(payload, 'Failed to load state'));
       }
       if (!payload.reply_pending && payload.reply_error) {
@@ -277,19 +283,11 @@
       return payload;
     }
 
-    function startPolling(options) {
-      const forceUntilAssistant = !!(options && options.forceUntilAssistant);
+    function startPolling() {
       if (polling) polling.stop();
       polling = window.NovelClawLive.poll(async (signal) => {
         const payload = await fetchState(false, signal);
         if (payload.reply_pending) return true;
-        const messages = Array.isArray(payload.messages) ? payload.messages : [];
-        const latestRole = messages.length ? String(messages[messages.length - 1].role || '') : '';
-        if (forceUntilAssistant && !payload.final_job_id && latestRole === 'user') {
-          setStatus('ok', labels.continuing);
-          ensurePendingVisual();
-          return true;
-        }
         renderMessages(feed, payload.messages, layout, labels, true);
         scrollFeedToBottom();
         if (payload.latest_turn && payload.latest_turn.role === 'assistant') animateAssistant(feed, payload.latest_turn);
@@ -342,7 +340,7 @@
         if (data.reply_pending) {
           setStatus('ok', labels.continuing);
           ensurePendingVisual();
-          startPolling({ forceUntilAssistant: true, maxTicks: 30 });
+          startPolling();
         } else {
           if (refreshWorkspaceWhenRunStarts(data)) {
             return;
@@ -366,11 +364,11 @@
       setBusy(true);
       setStatus('ok', labels.continuing);
       ensurePendingVisual();
-      startPolling({ forceUntilAssistant: true, maxTicks: 30 });
+      startPolling();
     } else if (latestVisibleMessageIsUser()) {
       setStatus('ok', labels.continuing);
       ensurePendingVisual();
-      startPolling({ forceUntilAssistant: true, maxTicks: 30 });
+      startPolling();
     }
 
     // Auto-resize textarea

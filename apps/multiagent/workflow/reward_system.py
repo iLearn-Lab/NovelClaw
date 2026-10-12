@@ -3,6 +3,7 @@
 """
 from typing import Dict, List, Optional
 import re
+from utils.text_metrics import text_length
 
 
 class RewardSystem:
@@ -44,9 +45,9 @@ class RewardSystem:
             consistency_issues = len(consistency_result.get("all_issues", []))
         
         # 计算文本长度奖励（鼓励达到目标长度，允许小幅超长）
-        text_length = len(generated_text)
+        measured_length = text_length(generated_text, getattr(self.config, "language", "zh"))
         target = max(target_length or 1000, 1)
-        length_score = min(1.2, text_length / target)
+        length_score = min(1.2, measured_length / target)
         
         # 计算结构完整性奖励
         structure_score = self._calculate_structure_score(generated_text)

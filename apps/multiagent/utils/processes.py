@@ -94,4 +94,10 @@ def run_logged_process(
                         except ProcessLookupError:
                             pass
                     process.wait()
+                if os.name != "nt":
+                    # The launcher can exit before a child that ignores SIGTERM.
+                    try:
+                        os.killpg(process.pid, signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
             log.write(f"[system] worker exited code={process.returncode}\n".encode())
